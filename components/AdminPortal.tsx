@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { StudentProfile, CourseModule } from '../types';
 import { 
@@ -244,8 +243,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ students, courses, initialTab
             {/* Leaderboard Chart */}
             <div className="lg:col-span-2 bg-trade-dark p-6 rounded-xl border border-gray-700">
               <h3 className="font-bold text-lg mb-6">Classroom P&L Distribution</h3>
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-64 w-full" style={{minHeight: '200px'}}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <BarChart data={classStats.pnlData}>
                     <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickMargin={10} />
                     <YAxis stroke="#64748b" fontSize={12} />
@@ -543,8 +542,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ students, courses, initialTab
           {/* Performance Charts */}
           <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
              <h3 className="font-bold text-lg mb-6">P&L Performance by Asset (Aggregated)</h3>
-             <div className="h-64 w-full">
-               <ResponsiveContainer width="100%" height="100%">
+             <div className="h-64 w-full" style={{minHeight: '200px'}}>
+               <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                  <BarChart data={tradeAnalytics.pairData}>
                    <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickMargin={10} />
                    <YAxis stroke="#64748b" fontSize={12} />
@@ -678,8 +677,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ students, courses, initialTab
            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 bg-trade-dark p-6 rounded-xl border border-gray-700">
                  <h3 className="font-bold text-lg mb-6">Revenue Trajectory</h3>
-                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                 <div className="h-64" style={{minHeight: '200px'}}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <AreaChart data={businessMetrics.revenueGrowthData}>
                             <defs>
                                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -701,8 +700,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ students, courses, initialTab
 
               <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
                  <h3 className="font-bold text-lg mb-6">Student Tiers</h3>
-                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                 <div className="h-64" style={{minHeight: '200px'}}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <PieChart>
                             <Pie
                                 data={businessMetrics.tierData}
@@ -730,8 +729,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ students, courses, initialTab
            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
                  <h3 className="font-bold text-lg mb-6">Course Completion Rate</h3>
-                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                 <div className="h-64" style={{minHeight: '200px'}}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <BarChart layout="vertical" data={businessMetrics.courseCompletionData}>
                             <XAxis type="number" stroke="#64748b" fontSize={12} />
                             <YAxis dataKey="name" type="category" width={120} stroke="#64748b" fontSize={11} />
@@ -749,8 +748,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ students, courses, initialTab
                  <h3 className="font-bold text-lg mb-6 flex items-center gap-2">
                     <ShieldAlert className="h-5 w-5 text-red-400" /> Top AI Rule Violations
                  </h3>
-                 <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                 <div className="h-64" style={{minHeight: '200px'}}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <BarChart data={businessMetrics.violationData}>
                             <XAxis dataKey="rule" stroke="#64748b" fontSize={10} tickMargin={10} />
                             <YAxis stroke="#64748b" fontSize={12} />

@@ -228,8 +228,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, courses, trades, onContinue
              </h3>
              <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">All Time</span>
           </div>
-          <div className="h-64 md:h-80">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 md:h-80" style={{minHeight: '200px'}}>
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={stats.equityCurveData}>
                 <defs>
                   <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
@@ -293,8 +293,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, courses, trades, onContinue
           {/* Weekly P&L Distribution */}
           <div className="bg-trade-dark p-6 rounded-xl border border-gray-700 flex-1">
              <h3 className="font-bold text-sm text-gray-400 mb-4 uppercase tracking-wider">Recent Trades P&L</h3>
-             <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
+             <div className="h-40" style={{minHeight: '150px'}}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                     <BarChart data={stats.equityCurveData.slice(-7)}>
                         <Bar dataKey="pnl" radius={[2, 2, 2, 2]}>
                         {stats.equityCurveData.slice(-7).map((entry, index) => (

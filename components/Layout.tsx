@@ -1,7 +1,7 @@
-
 import React, { useState } from 'react';
 import { LayoutDashboard, GraduationCap, Bot, BookOpen, Users, LogOut, Settings, ShieldAlert, Menu, X } from 'lucide-react';
 import { User } from '../types';
+import NavigationButtons from './NavigationButtons';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,6 +17,10 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView, on
   const handleNavClick = (viewId: string) => {
     onChangeView(viewId);
     setIsMobileMenuOpen(false);
+  };
+  
+  const handleRefresh = () => {
+    window.location.reload();
   };
   
   // Strict separation of portals
@@ -127,6 +131,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView, on
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto h-screen pt-16 md:pt-0 w-full">
         <div className="p-4 md:p-8 max-w-7xl mx-auto">
+          <NavigationButtons onRefresh={handleRefresh} />
           {children}
         </div>
       </main>
