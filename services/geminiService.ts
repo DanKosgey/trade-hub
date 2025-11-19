@@ -2,7 +2,14 @@ import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
 // Initialize Gemini
 // NOTE: In a real app, this would be imported from a secure config
-const API_KEY = process.env.API_KEY || ''; 
+const getApiKey = () => {
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    return process.env.API_KEY;
+  }
+  return '';
+};
+
+const API_KEY = getApiKey();
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 export const validateTradeWithGemini = async (
