@@ -358,7 +358,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier }) => {
               {/* Elite */}
               <div className="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl p-6 sm:p-8 flex flex-col">
                 <h3 className="text-lg sm:text-xl font-bold text-purple-400 mb-2">Elite Mentorship</h3>
-                <div className="text-3xl sm:text-4xl font-black mb-4 sm:mb-6">$1,997</div>
+                <div className="text-3xl sm:text-4xl font-black mb-4 sm:mb-6">$100</div>
                 <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 flex-1">
                   <li className="flex gap-2 sm:gap-3 text-gray-300"><Check className="text-purple-500 h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> <strong>Everything in Pro</strong></li>
                   <li className="flex gap-2 sm:gap-3 text-gray-300"><Check className="text-purple-500 h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> 2x Monthly 1-on-1 Calls</li>
