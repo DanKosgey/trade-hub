@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, GraduationCap, Bot, BookOpen, Users, LogOut, Settings, ShieldAlert, Menu, X } from 'lucide-react';
+import { LayoutDashboard, GraduationCap, Bot, BookOpen, Users, LogOut, Settings, ShieldAlert, Menu, X, Layers, PieChart as PieIcon } from 'lucide-react';
 import { User } from '../types';
 import NavigationButtons from './NavigationButtons';
 
@@ -29,7 +29,9 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView, on
   if (user.role === 'admin') {
     menuItems = [
       { id: 'admin-dashboard', label: 'Command Center', icon: ShieldAlert },
-      { id: 'admin-students', label: 'Student Directory', icon: Users },
+      { id: 'admin-students', label: 'Directory', icon: Users },
+      { id: 'admin-trades', label: 'Trade Analysis', icon: Layers },
+      { id: 'admin-analytics', label: 'Analytics', icon: PieIcon },
       { id: 'admin-content', label: 'Course Manager', icon: GraduationCap },
       { id: 'admin-rules', label: 'Rule Engine', icon: Settings },
     ];

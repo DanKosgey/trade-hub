@@ -337,6 +337,10 @@ function App() {
             return <AdminPortal courses={courses} initialTab="overview" />;
           case 'admin-students':
             return <AdminPortal courses={courses} initialTab="directory" />;
+          case 'admin-trades':
+            return <AdminPortal courses={courses} initialTab="trades" />;
+          case 'admin-analytics':
+            return <AdminPortal courses={courses} initialTab="analytics" />;
           case 'admin-rules':
             return (
               <RuleBuilder
