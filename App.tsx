@@ -11,6 +11,7 @@ import CourseBuilder from './components/CourseBuilder';
 import EliteApplicationForm from './components/EliteApplicationForm';
 import QuizPlayer from './components/QuizPlayer';
 import CommunityHub from './components/CommunityHub';
+import CourseManagementSystem from './components/enhanced/CourseManagementSystem';
 import { User, UserRole, CourseModule, TradeRule, TradeEntry, MentorshipApplication, StudentProfile } from './types';
 import { Lock, Settings, GraduationCap, BarChart, Bot, PlayCircle, CheckSquare, FileText, ArrowRight, ShieldAlert } from 'lucide-react';
 import { supabase } from './supabase/client';
@@ -143,6 +144,7 @@ function App() {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('Auth state changed:', _event, session);
       if (session?.user) {
         fetchProfile(session.user.id, session.user.email!);
         setViewState('portal');
@@ -157,6 +159,7 @@ function App() {
 
   const fetchProfile = async (userId: string, email: string) => {
     try {
+      console.log('Fetching profile for user:', userId);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -166,6 +169,7 @@ function App() {
       if (error) throw error;
 
       if (data) {
+        console.log('Profile found:', data);
         setUser({
           id: data.id,
           name: data.full_name || email.split('@')[0],
@@ -181,6 +185,8 @@ function App() {
         } else {
           setPortalView('dashboard');
         }
+      } else {
+        console.error('No profile found for user:', userId);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -352,12 +358,28 @@ function App() {
               />
             );
           case 'admin-content':
+            // Map User to StudentProfile for CourseManagementSystem
+            const adminProfile: StudentProfile = {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              tier: user.subscriptionTier || 'foundation',
+              joinedDate: new Date().toISOString(),
+              stats: {
+                winRate: 0,
+                totalPnL: 0,
+                tradesCount: 0,
+                avgRiskReward: 0,
+                currentDrawdown: 0
+              },
+              recentTrades: [],
+              status: 'active'
+            };
+            
             return (
-              <CourseBuilder
-                courses={courses}
-                onAdd={handleAddCourse}
-                onUpdate={handleUpdateCourse}
-                onDelete={handleDeleteCourse}
+              <CourseManagementSystem
+                currentUser={adminProfile}
+                isAdmin={true}
               />
             );
           default:
@@ -452,70 +474,29 @@ function App() {
             />
           );
         case 'courses':
+          // Map User to StudentProfile for CourseManagementSystem
+          const studentProfile: StudentProfile = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            tier: user.subscriptionTier || 'foundation',
+            joinedDate: new Date().toISOString(),
+            stats: {
+              winRate: 0,
+              totalPnL: 0,
+              tradesCount: 0,
+              avgRiskReward: 0,
+              currentDrawdown: 0
+            },
+            recentTrades: [],
+            status: 'active'
+          };
+          
           return (
-            <div className="text-white pb-10">
-              <div className="flex justify-between items-end mb-8">
-                <div>
-                  <h2 className="text-3xl font-bold flex items-center gap-3">
-                    <GraduationCap className="h-8 w-8 text-trade-accent" />
-                    Curriculum
-                  </h2>
-                  <p className="text-gray-400 mt-1">Master the Mbauni Protocol step-by-step.</p>
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold">{courses.filter(c => c.completed).length} / {courses.length}</div>
-                  <div className="text-xs text-gray-500 uppercase">Modules Completed</div>
-                </div>
-              </div>
-
-              {['beginner', 'intermediate', 'advanced'].map((level) => {
-                const levelCourses = courses.filter(c => c.level === level);
-                if (levelCourses.length === 0) return null;
-
-                return (
-                  <div key={level} className="mb-8">
-                    <h3 className="text-xl font-bold capitalize mb-4 border-b border-gray-800 pb-2 flex items-center gap-2">
-                      <span className={`w-2 h-6 rounded-sm ${level === 'beginner' ? 'bg-green-500' :
-                        level === 'intermediate' ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}></span>
-                      {level} Level
-                    </h3>
-                    <div className="space-y-4">
-                      {levelCourses.map(course => (
-                        <div key={course.id} className={`p-6 rounded-xl border transition-all ${course.locked
-                          ? 'bg-gray-900/50 border-gray-800 opacity-75'
-                          : 'bg-trade-dark border-gray-700 hover:border-trade-accent'
-                          } flex flex-col md:flex-row justify-between items-center gap-4`}>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-1">
-                              <h3 className={`font-bold text-lg ${course.locked ? 'text-gray-500' : 'text-white'}`}>{course.title}</h3>
-                              {course.completed && <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded font-bold uppercase">Completed</span>}
-                            </div>
-                            <p className="text-gray-400 text-sm">{course.description}</p>
-                            {course.quiz && <div className="flex items-center gap-1 mt-2 text-xs text-gray-500"><CheckSquare className="h-3 w-3" /> Quiz Available</div>}
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <span className="text-xs text-gray-500 font-mono bg-black/30 px-2 py-1 rounded">{course.duration}</span>
-                            {course.locked ? (
-                              <button disabled className="p-3 bg-gray-800 rounded-lg text-gray-600 cursor-not-allowed border border-gray-700">
-                                <Lock className="h-5 w-5" />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleStartLesson(course)}
-                                className="px-6 py-2 bg-trade-accent text-white rounded-lg hover:bg-blue-600 transition font-bold text-sm shadow-lg shadow-blue-900/20"
-                              >
-                                {course.completed ? 'Rewatch' : 'Start Lesson'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <CourseManagementSystem
+              currentUser={studentProfile}
+              isAdmin={false}
+            />
           );
 
         case 'lesson':

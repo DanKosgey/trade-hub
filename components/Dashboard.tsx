@@ -230,7 +230,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, courses, trades, onContinue
           </div>
           <div className="h-64 md:h-80" style={{minHeight: '200px'}}>
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-              <AreaChart data={stats.equityCurveData}>
+              <AreaChart data={stats.equityCurveData} width={undefined} height={undefined}>
                 <defs>
                   <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#00ff94" stopOpacity={0.3}/>
@@ -295,7 +295,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, courses, trades, onContinue
              <h3 className="font-bold text-sm text-gray-400 mb-4 uppercase tracking-wider">Recent Trades P&L</h3>
              <div className="h-40" style={{minHeight: '150px'}}>
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                    <BarChart data={stats.equityCurveData.slice(-7)}>
+                    <BarChart data={stats.equityCurveData.slice(-7)} width={undefined} height={undefined}>
                         <Bar dataKey="pnl" radius={[2, 2, 2, 2]}>
                         {stats.equityCurveData.slice(-7).map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10b981' : '#ef4444'} />

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Zap, Shield, TrendingUp, Play, Check, X, Star, Lock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { socialMediaService } from '../services/socialMediaService';
+import { SubscriptionPlan } from '../types';
 
 interface LandingPageProps {
   onSelectTier: (tier: 'free' | 'foundation' | 'professional' | 'elite') => void;
@@ -37,7 +39,76 @@ const AnimatedCandles: React.FC<{ direction: 'bull' | 'bear' }> = ({ direction }
 
 const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier }) => {
   const [showBear, setShowBear] = useState(false);
+  const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
   const controls = useAnimation();
+
+  // Fetch subscription plans
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const plans = await socialMediaService.getSubscriptionPlans();
+        setSubscriptionPlans(plans);
+      } catch (error) {
+        console.error('Error fetching subscription plans:', error);
+        // Fallback to default plans if fetch fails
+        setSubscriptionPlans([
+          {
+            id: 'free',
+            name: 'Free Plan',
+            description: 'Basic access to the platform',
+            price: 0,
+            interval: 'one-time',
+            features: ['Live Signals from Premium Groups', 'Basic Market Updates', 'Community Access'],
+            isActive: true,
+            sortOrder: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: 'foundation',
+            name: 'Foundation',
+            description: 'Core course modules and community access',
+            price: 45,
+            interval: 'one-time',
+            features: ['Modules 1-4 (Core CRT)', 'Private Community', 'Monthly Group Q&A'],
+            isActive: true,
+            sortOrder: 1,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: 'professional',
+            name: 'Professional',
+            description: 'Full course access with AI Trade Guard',
+            price: 60,
+            interval: 'one-time',
+            features: ['Everything in Foundation', 'AI Trade Guard Access', 'Full Course (Modules 1-6)', 'Advanced Journal & Analytics', 'Weekly Live Trading Room'],
+            isActive: true,
+            sortOrder: 2,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          },
+          {
+            id: 'elite',
+            name: 'Elite Mentorship',
+            description: 'Premium mentorship with personalized support',
+            price: 100,
+            interval: 'one-time',
+            features: ['Everything in Pro', '2x Monthly 1-on-1 Calls', 'Private Signal Group', 'Lifetime Updates'],
+            isActive: true,
+            sortOrder: 3,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+        ]);
+      } finally {
+        setLoadingPlans(false);
+      }
+    };
+
+    fetchPlans();
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -198,15 +269,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier }) => {
               </motion.button>
             </div>
 
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.2 }}
-              className="mt-6 sm:mt-8 text-green-400 font-bold flex items-center justify-center gap-2"
-            >
-              <span className="h-2 w-2 sm:h-3 sm:w-3 bg-green-400 rounded-full animate-ping" />
-              Over 1,247 students funded in 2025
-            </motion.p>
+
           </motion.div>
         </header>
 
@@ -307,69 +370,88 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier }) => {
               <p className="text-gray-400 text-sm sm:text-base">One-time payment. Lifetime access. No hidden fees.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-7xl mx-auto">
-              {/* Free Plan */}
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl p-6 sm:p-8 flex flex-col">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-400 mb-2">Free Plan</h3>
-                <div className="text-3xl sm:text-4xl font-black mb-4 sm:mb-6">$0</div>
-                <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 flex-1">
-                  <li className="flex gap-2 sm:gap-3 text-gray-300"><Check className="text-trade-neon h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> <strong>Live Signals from Premium Groups</strong></li>
-                  <li className="flex gap-2 sm:gap-3 text-gray-300"><Check className="text-trade-neon h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> Basic Market Updates</li>
-                  <li className="flex gap-2 sm:gap-3 text-gray-300"><Check className="text-trade-neon h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> Community Access</li>
-                </ul>
-                <button onClick={() => onSelectTier('free')} className="w-full py-3 sm:py-4 border border-gray-600 rounded-lg sm:rounded-xl font-bold hover:bg-gray-800 transition text-sm sm:text-base">
-                  Join for Free
-                </button>
+            {loadingPlans ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-trade-neon"></div>
               </div>
-
-              {/* Starter */}
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl p-6 sm:p-8 flex flex-col">
-                <h3 className="text-lg sm:text-xl font-bold text-gray-400 mb-2">Foundation</h3>
-                <div className="text-3xl sm:text-4xl font-black mb-4 sm:mb-6">$45</div>
-                <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 flex-1">
-                  <li className="flex gap-2 sm:gap-3 text-gray-300"><Check className="text-trade-neon h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> Modules 1-4 (Core CRT)</li>
-                  <li className="flex gap-2 sm:gap-3 text-gray-300"><Check className="text-trade-neon h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> Private Community</li>
-                  <li className="flex gap-2 sm:gap-3 text-gray-300"><Check className="text-trade-neon h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> Monthly Group Q&A</li>
-                </ul>
-                <button onClick={() => onSelectTier('foundation')} className="w-full py-3 sm:py-4 border border-gray-600 rounded-lg sm:rounded-xl font-bold hover:bg-gray-800 transition text-sm sm:text-base">
-                  Select Plan
-                </button>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-7xl mx-auto">
+                {subscriptionPlans.map((plan, index) => {
+                  // Determine styling based on plan position
+                  const isPopular = plan.name === 'Professional';
+                  const isElite = plan.name === 'Elite Mentorship';
+                  const isFree = plan.name === 'Free Plan';
+                  
+                  return (
+                    <div 
+                      key={plan.id}
+                      className={`bg-gray-900 border rounded-2xl sm:rounded-3xl p-6 sm:p-8 flex flex-col ${
+                        isPopular 
+                          ? 'border-2 border-trade-neon relative shadow-2xl shadow-trade-neon/20 md:my-0 my-4 md:scale-100 scale-[1.02]' 
+                          : isElite 
+                            ? 'border border-gray-800' 
+                            : 'border border-gray-800'
+                      }`}
+                    >
+                      {isPopular && (
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-trade-neon text-black font-bold px-3 py-1 sm:px-4 sm:py-1 rounded-full text-xs sm:text-sm">
+                          MOST POPULAR
+                        </div>
+                      )}
+                      
+                      <h3 className={`text-lg sm:text-xl font-bold mb-2 ${
+                        isElite ? 'text-purple-400' : isFree ? 'text-gray-400' : 'text-white'
+                      }`}>
+                        {plan.name}
+                      </h3>
+                      
+                      <div className={`text-3xl sm:text-4xl font-black mb-4 sm:mb-6 ${
+                        isPopular ? 'text-trade-neon' : isElite ? 'text-purple-400' : 'text-white'
+                      }`}>
+                        ${plan.price}
+                      </div>
+                      
+                      <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 flex-1">
+                        {plan.features.map((feature, idx) => (
+                          <li 
+                            key={idx} 
+                            className={`flex gap-2 sm:gap-3 ${
+                              isPopular || (isElite && idx === 0) 
+                                ? 'text-white' 
+                                : 'text-gray-300'
+                            }`}
+                          >
+                            <Check className={`h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0 ${
+                              isElite 
+                                ? 'text-purple-500' 
+                                : isPopular || (isFree && idx === 0)
+                                  ? 'text-trade-neon' 
+                                  : 'text-trade-neon'
+                            }`} /> 
+                            <span className={isPopular || (isElite && idx === 0) ? 'font-bold' : ''}>
+                              {feature}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      
+                      <button 
+                        onClick={() => onSelectTier(plan.id as any)}
+                        className={`w-full py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold transition text-sm sm:text-base ${
+                          isPopular 
+                            ? 'bg-trade-neon text-black hover:bg-green-400' 
+                            : isElite 
+                              ? 'bg-purple-600 hover:bg-purple-500 text-white' 
+                              : 'border border-gray-600 hover:bg-gray-800 text-white'
+                        }`}
+                      >
+                        {isFree ? 'Join for Free' : isElite ? 'Apply Now' : 'Get Started'}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-
-              {/* Professional - Popular Plan */}
-              <div className="bg-gray-900 border-2 border-trade-neon rounded-2xl sm:rounded-3xl p-6 sm:p-8 flex flex-col relative shadow-2xl shadow-trade-neon/20 md:my-0 my-4 md:scale-100 scale-[1.02]">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-trade-neon text-black font-bold px-3 py-1 sm:px-4 sm:py-1 rounded-full text-xs sm:text-sm">
-                  MOST POPULAR
-                </div>
-                <h3 className="text-lg sm:text-xl font-bold text-white mb-2">Professional</h3>
-                <div className="text-3xl sm:text-4xl font-black mb-4 sm:mb-6 text-trade-neon">$60</div>
-                <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 flex-1">
-                  <li className="flex gap-2 sm:gap-3 text-white"><Check className="text-trade-neon h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> <strong>Everything in Foundation</strong></li>
-                  <li className="flex gap-2 sm:gap-3 text-white"><Check className="text-trade-neon h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> <strong>AI Trade Guard Access</strong></li>
-                  <li className="flex gap-2 sm:gap-3 text-white"><Check className="text-trade-neon h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> Full Course (Modules 1-6)</li>
-                  <li className="flex gap-2 sm:gap-3 text-white"><Check className="text-trade-neon h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> Advanced Journal & Analytics</li>
-                  <li className="flex gap-2 sm:gap-3 text-white"><Check className="text-trade-neon h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> Weekly Live Trading Room</li>
-                </ul>
-                <button onClick={() => onSelectTier('professional')} className="w-full py-3 sm:py-4 bg-trade-neon text-black rounded-lg sm:rounded-xl font-black hover:bg-green-400 transition text-sm sm:text-base">
-                  Get Started
-                </button>
-              </div>
-
-              {/* Elite */}
-              <div className="bg-gray-900 border border-gray-800 rounded-2xl sm:rounded-3xl p-6 sm:p-8 flex flex-col">
-                <h3 className="text-lg sm:text-xl font-bold text-purple-400 mb-2">Elite Mentorship</h3>
-                <div className="text-3xl sm:text-4xl font-black mb-4 sm:mb-6">$100</div>
-                <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 flex-1">
-                  <li className="flex gap-2 sm:gap-3 text-gray-300"><Check className="text-purple-500 h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> <strong>Everything in Pro</strong></li>
-                  <li className="flex gap-2 sm:gap-3 text-gray-300"><Check className="text-purple-500 h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> 2x Monthly 1-on-1 Calls</li>
-                  <li className="flex gap-2 sm:gap-3 text-gray-300"><Check className="text-purple-500 h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> Private Signal Group</li>
-                  <li className="flex gap-2 sm:gap-3 text-gray-300"><Check className="text-purple-500 h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> Lifetime Updates</li>
-                </ul>
-                <button onClick={() => onSelectTier('elite')} className="w-full py-3 sm:py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-lg sm:rounded-xl font-bold transition text-sm sm:text-base">
-                  Apply Now
-                </button>
-              </div>
-            </div>
+            )}
           </div>
         </section>
 
@@ -419,7 +501,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier }) => {
             </motion.div>
 
             <p className="mt-6 sm:mt-8 text-red-400 font-bold text-base sm:text-lg">
-              ⏰ Price increases to $2,997 on January 1st, 2026
+              ⏰ Price increases to $100 on January 1st, 2026
             </p>
 
             <div className="mt-10 sm:mt-16 text-gray-600 text-xs sm:text-sm">

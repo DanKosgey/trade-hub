@@ -38,12 +38,12 @@ begin
         cm.title as module_title,
         case 
             when count(*) = 0 then 0
-            else round((count(*) filter (where pcm.completed = true) * 100.0) / greatest(count(*), 1), 2)
+            else round((count(*) filter (where mp.completed = true) * 100.0) / greatest(count(*), 1), 2)
         end as completion_rate,
         count(*) as total_students,
-        count(*) filter (where pcm.completed = true) as completed_students
+        count(*) filter (where mp.completed = true) as completed_students
     from course_modules cm
-    left join profile_course_modules pcm on cm.id = pcm.module_id
+    left join module_progress mp on cm.id = mp.module_id
     group by cm.id, cm.title
     order by cm.id;
 end;

@@ -1,12 +1,52 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Youtube, Twitter, Instagram, MessageCircle, Shield, Zap, Users, ArrowRight, Lock, Send, Phone } from 'lucide-react';
+import { socialMediaService } from '../services/socialMediaService';
+import { CommunityLink } from '../types';
 
 interface CommunityHubProps {
   subscriptionTier?: 'foundation' | 'professional' | 'elite' | 'elite-pending' | null;
+  userId?: string;
+  onJoinCommunity?: (platform: string) => void;
 }
 
-const CommunityHub: React.FC<CommunityHubProps> = ({ subscriptionTier }) => {
+const CommunityHub: React.FC<CommunityHubProps> = ({ subscriptionTier, userId, onJoinCommunity }) => {
   const hasPremiumAccess = subscriptionTier === 'professional' || subscriptionTier === 'elite';
+  const [communityLinks, setCommunityLinks] = useState<CommunityLink[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCommunityLinks = async () => {
+      try {
+        const links = await socialMediaService.getCommunityLinks();
+        setCommunityLinks(links);
+      } catch (error) {
+        console.error('Error fetching community links:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCommunityLinks();
+  }, []);
+
+  const handleJoinCommunity = async (platformKey: string) => {
+    if (userId) {
+      await socialMediaService.updateLastCommunityPlatform(userId, platformKey);
+    }
+    if (onJoinCommunity) {
+      onJoinCommunity(platformKey);
+    }
+  };
+
+  // Get premium community links
+  const premiumLinks = communityLinks.filter(link => 
+    link.platformKey === 'telegram' || link.platformKey === 'whatsapp'
+  );
+
+  // Get social platform links
+  const socialLinks = communityLinks.filter(link => 
+    link.platformKey !== 'telegram' && link.platformKey !== 'whatsapp'
+  );
 
   return (
     <div className="text-white pb-10 space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -27,10 +67,20 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ subscriptionTier }) => {
             The Mbauni Protocol isn't just a course—it's a movement. You are now part of an elite network of traders committed to institutional logic, data-driven decisions, and disciplined execution.
           </p>
           <div className="flex flex-wrap gap-4">
-            <button className="px-6 py-3 bg-[#5865F2] hover:bg-[#4752C4] text-white rounded-xl font-bold flex items-center gap-2 transition shadow-lg shadow-[#5865F2]/20">
-              <MessageCircle className="h-5 w-5" /> Join Discord Server
+            <button 
+              className="px-6 py-3 text-white rounded-xl font-bold flex items-center gap-2 transition shadow-lg"
+              style={{ backgroundColor: '#229ED9', boxShadow: '0 10px 15px -3px rgba(34, 158, 217, 0.2)' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1e8bc3'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#229ED9'}
+            >
+              <Send className="h-5 w-5" /> Join Telegram Community
             </button>
-            <button className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold flex items-center gap-2 transition border border-gray-700">
+            <button 
+              className="px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition border"
+              style={{ backgroundColor: 'transparent', borderColor: '#374151', color: 'white' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#374151'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
               Explore Events
             </button>
           </div>
@@ -48,67 +98,51 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ subscriptionTier }) => {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Telegram */}
-          <div className={`relative group p-8 rounded-2xl border transition-all duration-300 ${hasPremiumAccess
-              ? 'bg-[#229ED9]/5 border-[#229ED9]/20 hover:bg-[#229ED9]/10 cursor-pointer'
-              : 'bg-gray-900/50 border-gray-800 opacity-75'
-            }`}>
-            {!hasPremiumAccess && (
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center rounded-2xl text-center p-6">
-                <Lock className="h-8 w-8 text-gray-500 mb-2" />
-                <p className="text-white font-bold">Professional Tier Required</p>
-                <p className="text-sm text-gray-400 mt-1">Upgrade to access the private signal channel.</p>
-              </div>
-            )}
-
-            <div className="flex justify-between items-start mb-6">
-              <div className="p-4 bg-[#229ED9] rounded-xl text-white shadow-lg shadow-[#229ED9]/20">
-                <Send className="h-8 w-8" />
-              </div>
-              {hasPremiumAccess && (
-                <ArrowRight className="h-6 w-6 text-[#229ED9] opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0" />
-              )}
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-2">Telegram Signals</h3>
-            <p className="text-gray-400 mb-6">
-              Direct feed of high-probability setups, market structure shifts, and institutional order flow alerts.
-            </p>
-            <div className={`inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider ${hasPremiumAccess ? 'text-[#229ED9]' : 'text-gray-600'}`}>
-              {hasPremiumAccess ? 'Join Channel' : 'Locked'}
-            </div>
+        {loading ? (
+          <div className="flex justify-center items-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-trade-neon"></div>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {premiumLinks.map((link) => (
+              <div 
+                key={link.id}
+                className={`relative group p-8 rounded-2xl border transition-all duration-300 ${hasPremiumAccess
+                    ? `bg-[${link.iconColor}]/5 border-[${link.iconColor}]/20 hover:bg-[${link.iconColor}]/10 cursor-pointer`
+                    : 'bg-gray-900/50 border-gray-800 opacity-75'
+                  }`}
+                onClick={() => hasPremiumAccess && handleJoinCommunity(link.platformKey)}
+              >
+                {!hasPremiumAccess && (
+                  <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center rounded-2xl text-center p-6">
+                    <Lock className="h-8 w-8 text-gray-500 mb-2" />
+                    <p className="text-white font-bold">Professional Tier Required</p>
+                    <p className="text-sm text-gray-400 mt-1">Upgrade to access this premium group.</p>
+                  </div>
+                )}
 
-          {/* WhatsApp */}
-          <div className={`relative group p-8 rounded-2xl border transition-all duration-300 ${hasPremiumAccess
-              ? 'bg-[#25D366]/5 border-[#25D366]/20 hover:bg-[#25D366]/10 cursor-pointer'
-              : 'bg-gray-900/50 border-gray-800 opacity-75'
-            }`}>
-            {!hasPremiumAccess && (
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center rounded-2xl text-center p-6">
-                <Lock className="h-8 w-8 text-gray-500 mb-2" />
-                <p className="text-white font-bold">Professional Tier Required</p>
-                <p className="text-sm text-gray-400 mt-1">Upgrade to access the inner circle chat.</p>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="p-4 rounded-xl text-white shadow-lg" style={{ backgroundColor: link.iconColor }}>
+                    {link.platformKey === 'telegram' && <Send className="h-8 w-8" />}
+                    {link.platformKey === 'whatsapp' && <Phone className="h-8 w-8" />}
+                  </div>
+                  {hasPremiumAccess && (
+                    <ArrowRight className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0" style={{ color: link.iconColor }} />
+                  )}
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">
+                  {link.platformKey === 'telegram' ? 'Telegram Signals' : 'WhatsApp Inner Circle'}
+                </h3>
+                <p className="text-gray-400 mb-6">
+                  {link.description}
+                </p>
+                <div className={`inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider ${hasPremiumAccess ? '' : 'text-gray-600'}`} style={{ color: hasPremiumAccess ? link.iconColor : '' }}>
+                  {hasPremiumAccess ? 'Join Group' : 'Locked'}
+                </div>
               </div>
-            )}
-
-            <div className="flex justify-between items-start mb-6">
-              <div className="p-4 bg-[#25D366] rounded-xl text-white shadow-lg shadow-[#25D366]/20">
-                <Phone className="h-8 w-8" />
-              </div>
-              {hasPremiumAccess && (
-                <ArrowRight className="h-6 w-6 text-[#25D366] opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0" />
-              )}
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-2">WhatsApp Inner Circle</h3>
-            <p className="text-gray-400 mb-6">
-              Exclusive group for networking with funded traders. Share charts, discuss psychology, and grow together.
-            </p>
-            <div className={`inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider ${hasPremiumAccess ? 'text-[#25D366]' : 'text-gray-600'}`}>
-              {hasPremiumAccess ? 'Join Group' : 'Locked'}
-            </div>
+            ))}
           </div>
-        </div>
+        )}
       </div>
 
       {/* About Protocol Section */}
@@ -159,59 +193,61 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ subscriptionTier }) => {
       {/* Social Platforms */}
       <div>
         <h2 className="text-2xl font-bold mb-6">Connect Across Platforms</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Discord */}
-          <a href="#" className="group p-6 bg-[#5865F2]/5 border border-[#5865F2]/20 hover:bg-[#5865F2]/10 rounded-2xl transition-all duration-300">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-[#5865F2] rounded-xl text-white group-hover:scale-110 transition-transform">
-                <MessageCircle className="h-6 w-6" />
-              </div>
-              <ArrowRight className="h-5 w-5 text-[#5865F2] opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0" />
-            </div>
-            <h3 className="text-lg font-bold text-white mb-1">Discord</h3>
-            <p className="text-sm text-gray-400 mb-4">Private signals, live trading voice chat, and community analysis.</p>
-            <div className="text-xs font-bold text-[#5865F2] uppercase tracking-wider">Join Server</div>
-          </a>
-
-          {/* YouTube */}
-          <a href="#" className="group p-6 bg-[#FF0000]/5 border border-[#FF0000]/20 hover:bg-[#FF0000]/10 rounded-2xl transition-all duration-300">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-[#FF0000] rounded-xl text-white group-hover:scale-110 transition-transform">
-                <Youtube className="h-6 w-6" />
-              </div>
-              <ArrowRight className="h-5 w-5 text-[#FF0000] opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0" />
-            </div>
-            <h3 className="text-lg font-bold text-white mb-1">YouTube</h3>
-            <p className="text-sm text-gray-400 mb-4">Free educational content, weekly market recaps, and interviews.</p>
-            <div className="text-xs font-bold text-[#FF0000] uppercase tracking-wider">Subscribe</div>
-          </a>
-
-          {/* Twitter / X */}
-          <a href="#" className="group p-6 bg-gray-800/30 border border-gray-600 hover:bg-gray-800/60 rounded-2xl transition-all duration-300">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-black border border-gray-700 rounded-xl text-white group-hover:scale-110 transition-transform">
-                <Twitter className="h-6 w-6" />
-              </div>
-              <ArrowRight className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0" />
-            </div>
-            <h3 className="text-lg font-bold text-white mb-1">Twitter / X</h3>
-            <p className="text-sm text-gray-400 mb-4">Real-time market commentary, news updates, and quick tips.</p>
-            <div className="text-xs font-bold text-white uppercase tracking-wider">Follow</div>
-          </a>
-
-          {/* Instagram */}
-          <a href="#" className="group p-6 bg-pink-500/5 border border-pink-500/20 hover:bg-pink-500/10 rounded-2xl transition-all duration-300">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl text-white group-hover:scale-110 transition-transform">
-                <Instagram className="h-6 w-6" />
-              </div>
-              <ArrowRight className="h-5 w-5 text-pink-500 opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0" />
-            </div>
-            <h3 className="text-lg font-bold text-white mb-1">Instagram</h3>
-            <p className="text-sm text-gray-400 mb-4">Behind the scenes, lifestyle, and student success stories.</p>
-            <div className="text-xs font-bold text-pink-400 uppercase tracking-wider">Follow</div>
-          </a>
-        </div>
+        {loading ? (
+          <div className="flex justify-center items-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-trade-neon"></div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {socialLinks.map((link) => (
+              <a 
+                key={link.id}
+                href={link.linkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group p-6 rounded-2xl transition-all duration-300"
+                style={{
+                  backgroundColor: `${link.iconColor}0D`,
+                  borderColor: `${link.iconColor}33`
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = `${link.iconColor}1A`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = `${link.iconColor}0D`;
+                }}
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div 
+                    className="p-3 rounded-xl text-white group-hover:scale-110 transition-transform"
+                    style={{ backgroundColor: link.iconColor }}
+                  >
+                    {link.platformKey === 'youtube' && <Youtube className="h-6 w-6" />}
+                    {link.platformKey === 'twitter' && <Twitter className="h-6 w-6" />}
+                    {link.platformKey === 'instagram' && <Instagram className="h-6 w-6" />}
+                    {link.platformKey === 'tiktok' && <MessageCircle className="h-6 w-6" />}
+                  </div>
+                  <ArrowRight 
+                    className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0" 
+                    style={{ color: link.iconColor }} 
+                  />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-1">
+                  {link.platformName}
+                </h3>
+                <p className="text-sm text-gray-400 mb-4">
+                  {link.description}
+                </p>
+                <div 
+                  className="text-xs font-bold uppercase tracking-wider"
+                  style={{ color: link.iconColor }}
+                >
+                  Join Community
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

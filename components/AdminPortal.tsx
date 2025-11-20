@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { StudentProfile, CourseModule } from '../types';
+import { StudentProfile, CourseModule, SubscriptionPlan, PlanFeature, CommunityLink, TradeRule } from '../types';
+import CourseManagementSystem from './enhanced/CourseManagementSystem';
+import RuleBuilder from './RuleBuilder';
+import { socialMediaService } from '../services/socialMediaService';
+import { Plus, Edit2, Trash2, Save, Zap } from 'lucide-react';
 import { 
   Users, TrendingUp, AlertTriangle, Search, Eye, ShieldAlert, 
   ArrowUpRight, ArrowDownRight, BarChart2, DollarSign, X,
@@ -23,11 +27,11 @@ import {
 
 interface AdminPortalProps {
   courses: CourseModule[];
-  initialTab?: 'overview' | 'trades' | 'analytics' | 'directory';
+  initialTab?: 'overview' | 'trades' | 'analytics' | 'directory' | 'settings' | 'rules';
 }
 
 const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overview' }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'trades' | 'analytics' | 'directory'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'overview' | 'trades' | 'analytics' | 'directory' | 'settings' | 'rules'>(initialTab);
   const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
   
   // Data state
@@ -67,6 +71,21 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
     courseCompletionData: [] as { name: string; completion: number }[],
     violationData: [] as { rule: string; count: number }[]
   });
+
+  // --- Community Links ---
+  const [communityLinks, setCommunityLinks] = useState<CommunityLink[]>([]);
+  const [editingCommunityLink, setEditingCommunityLink] = useState<CommunityLink | null>(null);
+  const [showCommunityLinkForm, setShowCommunityLinkForm] = useState(false);
+
+  // --- Trade Rules ---
+  const [tradeRules, setTradeRules] = useState<TradeRule[]>([
+    { id: '1', text: 'Has price taken liquidity from previous day low?', type: 'buy', required: true },
+    { id: '2', text: 'Is there an unmitigated Fair Value Gap below current price?', type: 'buy', required: true },
+    { id: '3', text: 'Has market structure broken to the upside (MSS)?', type: 'buy', required: true },
+    { id: '4', text: 'Is your risk-to-reward ratio at least 1:2?', type: 'buy', required: true },
+    { id: '5', text: 'Has price taken liquidity from previous day high?', type: 'sell', required: true },
+    { id: '6', text: 'Is there an unmitigated Fair Value Gap above current price?', type: 'sell', required: true },
+  ]);
 
   // Sync initialTab prop changes
   useEffect(() => {
@@ -108,6 +127,12 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
         
         const violationData = await fetchRuleViolationsData();
         console.log('Violation data:', violationData);
+        
+        // Fetch community links
+        console.log('Fetching community links...');
+        const communityLinksData = await socialMediaService.getAllCommunityLinks();
+        console.log('Community links data:', communityLinksData);
+        setCommunityLinks(communityLinksData);
         
         const processedMetrics = {
           ...metrics,
@@ -199,6 +224,615 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
     setFilteredTrades(filtered);
   }, [allTrades, journalSearch, filterPair, filterOutcome]);
 
+  // Community Links Settings Component
+  const CommunityLinksSettings: React.FC = () => {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Community Links Management</h2>
+          <button 
+            onClick={() => setShowCommunityLinkForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-trade-neon text-black font-bold rounded-lg hover:bg-green-400 transition"
+          >
+            <Plus className="h-4 w-4" /> Add New Link
+          </button>
+        </div>
+
+        {/* Community Link Form Modal */}
+        {showCommunityLinkForm && (
+          <CommunityLinkForm 
+            onSubmit={handleCreateCommunityLink}
+            onCancel={() => setShowCommunityLinkForm(false)}
+          />
+        )}
+
+        {/* Edit Community Link Form Modal */}
+        {editingCommunityLink && (
+          <CommunityLinkForm 
+            link={editingCommunityLink}
+            onSubmit={(updates) => handleUpdateCommunityLink(editingCommunityLink.id, updates)}
+            onCancel={() => setEditingCommunityLink(null)}
+          />
+        )}
+
+        {/* Community Links List */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {communityLinks.map(link => (
+            <div key={link.id} className="bg-trade-dark border border-gray-700 rounded-xl p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: link.iconColor }}></div>
+                    {link.platformName}
+                  </h3>
+                  <p className="text-gray-400 text-sm">{link.linkUrl}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setEditingCommunityLink(link)}
+                    className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteCommunityLink(link.id)}
+                    className="p-2 bg-red-900/50 hover:bg-red-900/70 rounded-lg"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              
+              <p className="text-gray-300 mb-4">{link.description}</p>
+              
+              <div className="flex items-center justify-between">
+                <span className={`text-sm px-2 py-1 rounded-full ${link.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                  {link.isActive ? 'Active' : 'Inactive'}
+                </span>
+                <span className="text-sm text-gray-500">Order: {link.sortOrder}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Community Link Form Component
+  const CommunityLinkForm: React.FC<{ 
+    link?: CommunityLink;
+    onSubmit: (link: Omit<CommunityLink, 'id' | 'createdAt' | 'updatedAt'> | Partial<CommunityLink>) => void;
+    onCancel: () => void;
+  }> = ({ link, onSubmit, onCancel }) => {
+    const [formData, setFormData] = useState({
+      platformName: link?.platformName || '',
+      platformKey: link?.platformKey || '',
+      linkUrl: link?.linkUrl || '',
+      description: link?.description || '',
+      iconColor: link?.iconColor || '#000000',
+      isActive: link?.isActive !== undefined ? link.isActive : true,
+      sortOrder: link?.sortOrder || 0
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      const linkData = {
+        ...formData
+      };
+      onSubmit(linkData);
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+        <div 
+          className="bg-trade-dark border border-gray-700 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+            <h3 className="font-bold text-lg">{link ? 'Edit Community Link' : 'Create New Community Link'}</h3>
+            <button 
+              onClick={onCancel}
+              className="text-gray-400 hover:text-white"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          
+          <form onSubmit={handleSubmit} className="p-4 space-y-4 flex-1 overflow-y-auto max-h-[70vh]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Platform Name</label>
+                <input
+                  type="text"
+                  value={formData.platformName}
+                  onChange={e => setFormData({...formData, platformName: e.target.value})}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-trade-neon outline-none"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Platform Key</label>
+                <input
+                  type="text"
+                  value={formData.platformKey}
+                  onChange={e => setFormData({...formData, platformKey: e.target.value})}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-trade-neon outline-none"
+                  required
+                  placeholder="e.g., telegram, whatsapp, tiktok"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Link URL</label>
+              <input
+                type="url"
+                value={formData.linkUrl}
+                onChange={e => setFormData({...formData, linkUrl: e.target.value})}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-trade-neon outline-none"
+                required
+                placeholder="https://example.com/community"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Description</label>
+              <textarea
+                value={formData.description}
+                onChange={e => setFormData({...formData, description: e.target.value})}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-trade-neon outline-none h-24"
+                required
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Icon Color</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={formData.iconColor}
+                    onChange={e => setFormData({...formData, iconColor: e.target.value})}
+                    className="w-10 h-10 border border-gray-600 rounded bg-gray-700"
+                  />
+                  <input
+                    type="text"
+                    value={formData.iconColor}
+                    onChange={e => setFormData({...formData, iconColor: e.target.value})}
+                    className="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-trade-neon outline-none"
+                    placeholder="#000000"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Sort Order</label>
+                <input
+                  type="number"
+                  value={formData.sortOrder}
+                  onChange={e => setFormData({...formData, sortOrder: Number(e.target.value)})}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-trade-neon outline-none"
+                  required
+                  min="0"
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isActive"
+                checked={formData.isActive}
+                onChange={e => setFormData({...formData, isActive: e.target.checked})}
+                className="h-4 w-4 text-trade-neon focus:ring-trade-neon border-gray-600 rounded bg-gray-700"
+              />
+              <label htmlFor="isActive" className="text-sm text-gray-300">Active Link</label>
+            </div>
+          </form>
+          
+          <div className="p-4 border-t border-gray-700 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg font-bold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              onClick={handleSubmit}
+              className="px-4 py-2 bg-trade-neon text-black font-bold rounded-lg hover:bg-green-400"
+            >
+              {link ? 'Update Link' : 'Create Link'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Subscription Plan Settings Component
+  const SubscriptionPlanSettings: React.FC = () => {
+    const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+    const [features, setFeatures] = useState<PlanFeature[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
+    const [editingFeature, setEditingFeature] = useState<PlanFeature | null>(null);
+    const [showPlanForm, setShowPlanForm] = useState(false);
+    const [showFeatureForm, setShowFeatureForm] = useState(false);
+
+    useEffect(() => {
+      fetchPlans();
+    }, []);
+
+    const fetchPlans = async () => {
+      try {
+        setLoading(true);
+        const allPlans = await socialMediaService.getAllSubscriptionPlans();
+        setPlans(allPlans);
+      } catch (error) {
+        console.error('Error fetching plans:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleCreatePlan = async (plan: Omit<SubscriptionPlan, 'id' | 'createdAt' | 'updatedAt'>) => {
+      try {
+        const newPlan = await socialMediaService.createSubscriptionPlan(plan);
+        if (newPlan) {
+          setPlans([...plans, newPlan]);
+          setShowPlanForm(false);
+        }
+      } catch (error) {
+        console.error('Error creating plan:', error);
+      }
+    };
+
+    const handleUpdatePlan = async (id: string, updates: Partial<SubscriptionPlan>) => {
+      try {
+        const success = await socialMediaService.updateSubscriptionPlan(id, updates);
+        if (success) {
+          setPlans(plans.map(plan => plan.id === id ? { ...plan, ...updates } as SubscriptionPlan : plan));
+          setEditingPlan(null);
+        }
+      } catch (error) {
+        console.error('Error updating plan:', error);
+      }
+    };
+
+    const handleDeletePlan = async (id: string) => {
+      if (window.confirm('Are you sure you want to delete this plan?')) {
+        try {
+          const success = await socialMediaService.deleteSubscriptionPlan(id);
+          if (success) {
+            setPlans(plans.filter(plan => plan.id !== id));
+          }
+        } catch (error) {
+          console.error('Error deleting plan:', error);
+        }
+      }
+    };
+
+    const handleCreateFeature = async (feature: Omit<PlanFeature, 'id' | 'createdAt'>) => {
+      try {
+        const newFeature = await socialMediaService.createPlanFeature(feature);
+        if (newFeature) {
+          setFeatures([...features, newFeature]);
+          setShowFeatureForm(false);
+        }
+      } catch (error) {
+        console.error('Error creating feature:', error);
+      }
+    };
+
+    const handleUpdateFeature = async (id: string, updates: Partial<PlanFeature>) => {
+      try {
+        const success = await socialMediaService.updatePlanFeature(id, updates);
+        if (success) {
+          setFeatures(features.map(feature => feature.id === id ? { ...feature, ...updates } as PlanFeature : feature));
+          setEditingFeature(null);
+        }
+      } catch (error) {
+        console.error('Error updating feature:', error);
+      }
+    };
+
+    const handleDeleteFeature = async (id: string) => {
+      if (window.confirm('Are you sure you want to delete this feature?')) {
+        try {
+          const success = await socialMediaService.deletePlanFeature(id);
+          if (success) {
+            setFeatures(features.filter(feature => feature.id !== id));
+          }
+        } catch (error) {
+          console.error('Error deleting feature:', error);
+        }
+      }
+    };
+
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-trade-neon"></div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold">Subscription Plan Management</h2>
+          <button 
+            onClick={() => setShowPlanForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-trade-neon text-black font-bold rounded-lg hover:bg-green-400 transition"
+          >
+            <Plus className="h-4 w-4" /> Add New Plan
+          </button>
+        </div>
+
+        {/* Plan Form Modal */}
+        {showPlanForm && (
+          <PlanForm 
+            onSubmit={handleCreatePlan}
+            onCancel={() => setShowPlanForm(false)}
+          />
+        )}
+
+        {/* Edit Plan Form Modal */}
+        {editingPlan && (
+          <PlanForm 
+            plan={editingPlan}
+            onSubmit={(updates) => handleUpdatePlan(editingPlan.id, updates)}
+            onCancel={() => setEditingPlan(null)}
+          />
+        )}
+
+        {/* Plans List */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {plans.map(plan => (
+            <div key={plan.id} className="bg-trade-dark border border-gray-700 rounded-xl p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-xl font-bold">{plan.name}</h3>
+                  <p className="text-gray-400 text-sm">${plan.price} ({plan.interval})</p>
+                </div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setEditingPlan(plan)}
+                    className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                  <button 
+                    onClick={() => handleDeletePlan(plan.id)}
+                    className="p-2 bg-red-900/50 hover:bg-red-900/70 rounded-lg"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              
+              <p className="text-gray-300 mb-4">{plan.description}</p>
+              
+              <div className="flex items-center justify-between">
+                <span className={`text-sm px-2 py-1 rounded-full ${plan.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                  {plan.isActive ? 'Active' : 'Inactive'}
+                </span>
+                <span className="text-sm text-gray-500">Order: {plan.sortOrder}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Plan Form Component
+  const PlanForm: React.FC<{ 
+    plan?: SubscriptionPlan;
+    onSubmit: (plan: Omit<SubscriptionPlan, 'id' | 'createdAt' | 'updatedAt'> | Partial<SubscriptionPlan>) => void;
+    onCancel: () => void;
+  }> = ({ plan, onSubmit, onCancel }) => {
+    const [formData, setFormData] = useState({
+      name: plan?.name || '',
+      description: plan?.description || '',
+      price: plan?.price || 0,
+      interval: plan?.interval || 'one-time',
+      features: plan?.features?.join('\n') || '',
+      isActive: plan?.isActive !== undefined ? plan.isActive : true,
+      sortOrder: plan?.sortOrder || 0
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      const planData = {
+        ...formData,
+        features: formData.features.split('\n').filter(f => f.trim() !== ''),
+        price: Number(formData.price)
+      };
+      onSubmit(planData);
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4">
+        <div 
+          className="bg-trade-dark border border-gray-700 w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+            <h3 className="font-bold text-lg">{plan ? 'Edit Plan' : 'Create New Plan'}</h3>
+            <button 
+              onClick={onCancel}
+              className="text-gray-400 hover:text-white"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          
+          <form onSubmit={handleSubmit} className="p-4 space-y-4 flex-1 overflow-y-auto max-h-[70vh]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Plan Name</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={e => setFormData({...formData, name: e.target.value})}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-trade-neon outline-none"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Price ($)</label>
+                <input
+                  type="number"
+                  value={formData.price}
+                  onChange={e => setFormData({...formData, price: Number(e.target.value)})}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-trade-neon outline-none"
+                  required
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Description</label>
+              <textarea
+                value={formData.description}
+                onChange={e => setFormData({...formData, description: e.target.value})}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-trade-neon outline-none h-24"
+                required
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Interval</label>
+                <select
+                  value={formData.interval}
+                  onChange={e => setFormData({...formData, interval: e.target.value as any})}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-trade-neon outline-none"
+                >
+                  <option value="one-time">One-time</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Sort Order</label>
+                <input
+                  type="number"
+                  value={formData.sortOrder}
+                  onChange={e => setFormData({...formData, sortOrder: Number(e.target.value)})}
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-trade-neon outline-none"
+                  required
+                  min="0"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-xs text-gray-400 mb-1 uppercase font-bold">Features (one per line)</label>
+              <textarea
+                value={formData.features}
+                onChange={e => setFormData({...formData, features: e.target.value})}
+                className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white focus:border-trade-neon outline-none h-32"
+                placeholder="Enter one feature per line"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isActive"
+                checked={formData.isActive}
+                onChange={e => setFormData({...formData, isActive: e.target.checked})}
+                className="h-4 w-4 text-trade-neon focus:ring-trade-neon border-gray-600 rounded bg-gray-700"
+              />
+              <label htmlFor="isActive" className="text-sm text-gray-300">Active Plan</label>
+            </div>
+          </form>
+          
+          <div className="p-4 border-t border-gray-700 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg font-bold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              onClick={handleSubmit}
+              className="px-4 py-2 bg-trade-neon text-black font-bold rounded-lg hover:bg-green-400"
+            >
+              {plan ? 'Update Plan' : 'Create Plan'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Community Links Management
+  const handleCreateCommunityLink = async (link: Omit<CommunityLink, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      const newLink = await socialMediaService.createCommunityLink(link);
+      if (newLink) {
+        setCommunityLinks([...communityLinks, newLink]);
+        setShowCommunityLinkForm(false);
+      }
+    } catch (error) {
+      console.error('Error creating community link:', error);
+    }
+  };
+
+  const handleUpdateCommunityLink = async (id: string, updates: Partial<CommunityLink>) => {
+    try {
+      const success = await socialMediaService.updateCommunityLink(id, updates);
+      if (success) {
+        setCommunityLinks(communityLinks.map(link => link.id === id ? { ...link, ...updates } as CommunityLink : link));
+        setEditingCommunityLink(null);
+      }
+    } catch (error) {
+      console.error('Error updating community link:', error);
+    }
+  };
+
+  const handleDeleteCommunityLink = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this community link?')) {
+      try {
+        const success = await socialMediaService.deleteCommunityLink(id);
+        if (success) {
+          setCommunityLinks(communityLinks.filter(link => link.id !== id));
+        }
+      } catch (error) {
+        console.error('Error deleting community link:', error);
+      }
+    }
+  };
+
+  // Rule Engine Handlers
+  const handleAddRule = (rule: TradeRule) => {
+    setTradeRules(prev => [...prev, rule]);
+  };
+
+  const handleUpdateRule = (id: string, updates: Partial<TradeRule>) => {
+    setTradeRules(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+  };
+
+  const handleDeleteRule = (id: string) => {
+    setTradeRules(prev => prev.filter(r => r.id !== id));
+  };
+
+  const handleReorderRules = (newRules: TradeRule[]) => {
+    setTradeRules(newRules);
+  };
+
   // Calculate trade analytics
   const tradeAnalytics = (() => {
     const total = filteredTrades.length;
@@ -274,6 +908,9 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
             { id: 'directory', label: 'Directory', icon: Users },
             { id: 'trades', label: 'Trade Analysis', icon: Layers },
             { id: 'analytics', label: 'Analytics', icon: PieIcon },
+            { id: 'content', label: 'Content Mgmt', icon: BookOpen },
+            { id: 'rules', label: 'Rule Engine', icon: Zap },
+            { id: 'settings', label: 'Settings', icon: CreditCard },
           ].map(tab => {
              const Icon = tab.icon;
              return (
@@ -307,6 +944,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
               </div>
               <div className={`text-2xl md:text-3xl font-bold ${classStats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 {classStats.totalPnL >= 0 ? '+' : ''}${classStats.totalPnL.toLocaleString()}
+
               </div>
             </div>
 
@@ -890,6 +1528,52 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
                  </div>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* ================= CONTENT MANAGEMENT TAB ================= */}
+      {activeTab === 'content' && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <CourseManagementSystem 
+            currentUser={{
+              id: '00000000-0000-0000-0000-000000000000',
+              name: 'Admin User',
+              email: 'admin@example.com',
+              tier: 'elite',
+              joinedDate: new Date().toISOString(),
+              stats: {
+                winRate: 0,
+                totalPnL: 0,
+                tradesCount: 0,
+                avgRiskReward: 0,
+                currentDrawdown: 0
+              },
+              recentTrades: [],
+              status: 'active'
+            }}
+            isAdmin={true}
+          />
+        </div>
+      )}
+
+      {/* ================= SETTINGS TAB ================= */}
+      {activeTab === 'settings' && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <SubscriptionPlanSettings />
+          <CommunityLinksSettings />
+        </div>
+      )}
+
+      {/* ================= RULE ENGINE TAB ================= */}
+      {activeTab === 'rules' && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <RuleBuilder
+            rules={tradeRules}
+            onAdd={handleAddRule}
+            onUpdate={handleUpdateRule}
+            onDelete={handleDeleteRule}
+            onReorder={handleReorderRules}
+          />
         </div>
       )}
 
