@@ -22,7 +22,8 @@ import {
   fetchComprehensiveAnalytics,
   fetchRevenueGrowthData,
   fetchCourseCompletionData,
-  fetchRuleViolationsData
+  fetchRuleViolationsData,
+  fetchCourseEnrollmentCounts
 } from '../services/adminService';
 
 interface AdminPortalProps {
@@ -125,6 +126,9 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
         const courseCompletionData = await fetchCourseCompletionData();
         console.log('Course completion data:', courseCompletionData);
         
+        const courseEnrollmentCounts = await fetchCourseEnrollmentCounts();
+        console.log('Course enrollment counts data:', courseEnrollmentCounts);
+        
         const violationData = await fetchRuleViolationsData();
         console.log('Violation data:', violationData);
         
@@ -146,10 +150,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
                 { month: 'May 2023', revenue: 0 },
                 { month: 'Jun 2023', revenue: 0 }
               ],
-          courseCompletionData: courseCompletionData && courseCompletionData.length > 0
-            ? courseCompletionData.map(item => ({
-                name: item.name && item.name.length > 20 ? item.name.substring(0, 20) + '...' : (item.name || 'Unknown Module'),
-                completion: item.completion || 0
+          courseCompletionData: courseEnrollmentCounts && courseEnrollmentCounts.length > 0
+            ? courseEnrollmentCounts.map(item => ({
+                name: item.name && item.name.length > 20 ? item.name.substring(0, 20) + '...' : (item.name || 'Unknown Course'),
+                completion: item.count > 0 ? Math.round((item.completed / item.count) * 100) : 0
               }))
             : [
                 { name: 'No data available', completion: 0 }

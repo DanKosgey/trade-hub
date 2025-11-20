@@ -385,19 +385,32 @@ const CourseManagementSystem: React.FC<CourseManagementSystemProps> = ({
       );
       
       if (success) {
-        setProgress(progress.map(p => 
+        // Update the progress state to include the newly completed module
+        const updatedProgress = progress.map(p => 
           p.moduleId === moduleId 
             ? { ...p, completed: true, completedAt: new Date() } 
             : p
-        ));
+        );
+        
+        // If the module wasn't in the progress array before, add it
+        if (!progress.some(p => p.moduleId === moduleId)) {
+          updatedProgress.push({ 
+            profileId: currentUser.id, 
+            moduleId, 
+            completed: true, 
+            completedAt: new Date() 
+          });
+        }
+        
+        setProgress(updatedProgress);
         
         // Update enrollment progress
         const module = modules.find(m => m.id === moduleId);
         if (module?.courseId) {
-          // Recalculate course progress and update enrollment
+          // Recalculate course progress and update enrollment using the updated progress
           const courseModules = modules.filter(m => m.courseId === module.courseId);
           const completedModules = courseModules.filter(m => 
-            progress.some(p => p.moduleId === m.id && p.completed)
+            updatedProgress.some(p => p.moduleId === m.id && p.completed)
           ).length;
           
           const courseProgress = Math.round((completedModules / courseModules.length) * 100);
@@ -408,7 +421,16 @@ const CourseManagementSystem: React.FC<CourseManagementSystemProps> = ({
           );
           
           if (enrollment) {
+            // Always update progress
             await handleUpdateEnrollment(enrollment.id, { progress: courseProgress });
+            
+            // Check if all modules are completed and update enrollment status if needed
+            if (completedModules === courseModules.length && enrollment.status !== 'completed') {
+              await handleUpdateEnrollment(enrollment.id, { 
+                progress: 100, 
+                status: 'completed'
+              });
+            }
           }
         }
       }

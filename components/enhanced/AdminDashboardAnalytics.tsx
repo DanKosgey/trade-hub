@@ -8,6 +8,13 @@ import {
   TrendingUp, Users, BookOpen, CheckCircle, Clock, 
   AlertTriangle, Award, Target, Calendar, Layers
 } from 'lucide-react';
+import { 
+  fetchCourseEnrollmentTrends,
+  fetchModuleCompletionRates,
+  fetchCourseEnrollmentCounts,
+  fetchCourseDifficultyDistribution,
+  fetchContentTypeDistribution
+} from '../../services/adminService';
 
 interface AdminDashboardAnalyticsProps {
   courses: Course[];
@@ -24,6 +31,12 @@ const AdminDashboardAnalytics: React.FC<AdminDashboardAnalyticsProps> = ({
 }) => {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
   const [selectedCourse, setSelectedCourse] = useState<string>('all');
+  const [enrollmentTrendData, setEnrollmentTrendData] = useState<any[]>([]);
+  const [moduleCompletionData, setModuleCompletionData] = useState<any[]>([]);
+  const [enrollmentsByCourse, setEnrollmentsByCourse] = useState<any[]>([]);
+  const [difficultyDistribution, setDifficultyDistribution] = useState<any[]>([]);
+  const [contentTypeDistribution, setContentTypeDistribution] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Calculate statistics
   const totalCourses = courses.length;
@@ -42,136 +55,76 @@ const AdminDashboardAnalytics: React.FC<AdminDashboardAnalyticsProps> = ({
     ? Math.round(enrollments.reduce((acc, e) => acc + (e.progress || 0), 0) / enrollments.length)
     : 0;
 
-  // Get enrollments by course
-  const getEnrollmentsByCourse = () => {
-    const courseEnrollments: Record<string, { course: Course, count: number, completed: number }> = {};
-    
-    courses.forEach(course => {
-      courseEnrollments[course.id] = {
-        course,
-        count: 0,
-        completed: 0
-      };
-    });
-    
-    enrollments.forEach(enrollment => {
-      if (courseEnrollments[enrollment.courseId]) {
-        courseEnrollments[enrollment.courseId].count += 1;
-        if (enrollment.status === 'completed') {
-          courseEnrollments[enrollment.courseId].completed += 1;
-        }
+  // Fetch real analytics data
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Determine days based on time range
+        const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 30;
+        
+        // Fetch all analytics data in parallel
+        const [
+          enrollmentTrends,
+          completionRates,
+          enrollmentCounts,
+          difficultyDist,
+          contentTypeDist
+        ] = await Promise.all([
+          fetchCourseEnrollmentTrends(days),
+          fetchModuleCompletionRates(),
+          fetchCourseEnrollmentCounts(),
+          fetchCourseDifficultyDistribution(),
+          fetchContentTypeDistribution()
+        ]);
+
+        setEnrollmentTrendData(enrollmentTrends);
+        setModuleCompletionData(completionRates);
+        setEnrollmentsByCourse(enrollmentCounts);
+        setDifficultyDistribution(difficultyDist);
+        setContentTypeDistribution(contentTypeDist);
+      } catch (error) {
+        console.error('Error fetching analytics data:', error);
+      } finally {
+        setLoading(false);
       }
-    });
-    
-    return Object.values(courseEnrollments)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10); // Top 10 courses
-  };
-
-  // Get enrollment trend data
-  const getEnrollmentTrendData = () => {
-    // This is a simplified version - in a real app, you would have actual dates
-    const data = [];
-    const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 30;
-    
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      
-      // Simulate enrollment data
-      const enrollmentsOnDate = Math.floor(Math.random() * 10) + 5;
-      
-      data.push({
-        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        enrollments: enrollmentsOnDate,
-        completions: Math.floor(enrollmentsOnDate * (completionRate / 100))
-      });
-    }
-    
-    return data;
-  };
-
-  // Get module completion data
-  const getModuleCompletionData = () => {
-    // Group modules by course
-    const courseModules: Record<string, CourseModule[]> = {};
-    
-    modules.forEach(module => {
-      if (!courseModules[module.courseId || '']) {
-        courseModules[module.courseId || ''] = [];
-      }
-      courseModules[module.courseId || ''].push(module);
-    });
-    
-    // Calculate completion rate for each course
-    const data = Object.entries(courseModules).map(([courseId, courseModules]) => {
-      const course = courses.find(c => c.id === courseId);
-      if (!course) return null;
-      
-      const totalModules = courseModules.length;
-      const completedModules = courseModules.filter(module => {
-        return progress.some(p => p.moduleId === module.id && p.completed);
-      }).length;
-      
-      const completionRate = totalModules > 0 
-        ? Math.round((completedModules / totalModules) * 100) 
-        : 0;
-      
-      return {
-        name: course.title.length > 20 ? course.title.substring(0, 20) + '...' : course.title,
-        completion: completionRate,
-        total: totalModules,
-        completed: completedModules
-      };
-    }).filter(Boolean) as { name: string, completion: number, total: number, completed: number }[];
-    
-    return data.sort((a, b) => b.completion - a.completion).slice(0, 10);
-  };
-
-  // Get difficulty distribution
-  const getDifficultyDistribution = () => {
-    const distribution: Record<string, number> = {
-      beginner: 0,
-      intermediate: 0,
-      advanced: 0
     };
-    
-    courses.forEach(course => {
-      distribution[course.level] = (distribution[course.level] || 0) + 1;
+
+    fetchData();
+  }, [timeRange]);
+
+  // Get difficulty distribution with colors
+  const getDifficultyDistributionWithColors = () => {
+    return difficultyDistribution.map(item => {
+      let color = '#8B5CF6'; // Default color
+      if (item.name === 'Beginner') color = '#10B981';
+      if (item.name === 'Intermediate') color = '#F59E0B';
+      if (item.name === 'Advanced') color = '#EF4444';
+      return { ...item, color };
     });
-    
-    return [
-      { name: 'Beginner', value: distribution.beginner, color: '#10B981' },
-      { name: 'Intermediate', value: distribution.intermediate, color: '#F59E0B' },
-      { name: 'Advanced', value: distribution.advanced, color: '#EF4444' }
-    ];
   };
 
-  // Get content type distribution
-  const getContentTypeDistribution = () => {
-    const distribution: Record<string, number> = {
-      video: 0,
-      text: 0
-    };
-    
-    modules.forEach(module => {
-      if (module.contentType) {
-        distribution[module.contentType] = (distribution[module.contentType] || 0) + 1;
-      }
+  // Get content type distribution with colors
+  const getContentTypeDistributionWithColors = () => {
+    return contentTypeDistribution.map(item => {
+      let color = '#3B82F6'; // Default color
+      if (item.name === 'Video') color = '#3B82F6';
+      if (item.name === 'Text') color = '#8B5CF6';
+      return { ...item, color };
     });
-    
-    return [
-      { name: 'Video', value: distribution.video, color: '#3B82F6' },
-      { name: 'Text', value: distribution.text, color: '#8B5CF6' }
-    ];
   };
 
   // Data for charts
-  const enrollmentTrendData = getEnrollmentTrendData();
-  const enrollmentsByCourse = getEnrollmentsByCourse();
-  const moduleCompletionData = getModuleCompletionData();
-  const difficultyDistribution = getDifficultyDistribution();
-  const contentTypeDistribution = getContentTypeDistribution();
+  const difficultyDistributionWithColors = getDifficultyDistributionWithColors();
+  const contentTypeDistributionWithColors = getContentTypeDistributionWithColors();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-trade-neon"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="text-white pb-10">
@@ -342,7 +295,7 @@ const AdminDashboardAnalytics: React.FC<AdminDashboardAnalyticsProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={enrollmentsByCourse}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="course.title" stroke="#9CA3AF" />
+                <XAxis dataKey="name" stroke="#9CA3AF" />
                 <YAxis stroke="#9CA3AF" />
                 <Tooltip 
                   contentStyle={{ 
@@ -367,7 +320,7 @@ const AdminDashboardAnalytics: React.FC<AdminDashboardAnalyticsProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={difficultyDistribution}
+                  data={difficultyDistributionWithColors}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
@@ -376,7 +329,7 @@ const AdminDashboardAnalytics: React.FC<AdminDashboardAnalyticsProps> = ({
                   dataKey="value"
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 >
-                  {difficultyDistribution.map((entry, index) => (
+                  {difficultyDistributionWithColors.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -403,7 +356,7 @@ const AdminDashboardAnalytics: React.FC<AdminDashboardAnalyticsProps> = ({
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={contentTypeDistribution}
+                data={contentTypeDistributionWithColors}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
@@ -412,7 +365,7 @@ const AdminDashboardAnalytics: React.FC<AdminDashboardAnalyticsProps> = ({
                 dataKey="value"
                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
               >
-                {contentTypeDistribution.map((entry, index) => (
+                {contentTypeDistributionWithColors.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>

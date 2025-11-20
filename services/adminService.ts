@@ -326,3 +326,159 @@ export const fetchStudentWithTrades = async (studentId: string): Promise<Student
     throw error;
   }
 };
+
+// Function to fetch course enrollment trends
+export const fetchCourseEnrollmentTrends = async (days: number = 30) => {
+  try {
+    console.log('Fetching course enrollment trends...');
+    const { data, error } = await supabase.rpc('get_course_enrollment_trends', { days });
+    
+    if (error) {
+      console.error('RPC Error in fetchCourseEnrollmentTrends:', error);
+      throw error;
+    }
+    
+    console.log('Course enrollment trends data:', data);
+    
+    return data.map((item: any) => ({
+      date: item.date || 'Unknown',
+      enrollments: parseInt(item.enrollments) || 0,
+      completions: parseInt(item.completions) || 0
+    }));
+  } catch (error: any) {
+    console.error('Error fetching course enrollment trends:', error);
+    console.error('Error details:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint
+    });
+    // Return empty array as fallback
+    return [];
+  }
+};
+
+// Function to fetch module completion rates
+export const fetchModuleCompletionRates = async () => {
+  try {
+    console.log('Fetching module completion rates...');
+    const { data, error } = await supabase.rpc('get_module_completion_rates');
+    
+    if (error) {
+      console.error('RPC Error in fetchModuleCompletionRates:', error);
+      throw error;
+    }
+    
+    console.log('Module completion rates data:', data);
+    
+    return data.map((item: any) => ({
+      courseId: item.course_id || '',
+      name: item.course_title || 'Unknown Course',
+      completion: parseFloat(item.completion_rate) || 0,
+      total: parseInt(item.total_modules) || 0,
+      completed: parseInt(item.completed_modules) || 0
+    }));
+  } catch (error: any) {
+    console.error('Error fetching module completion rates:', error);
+    console.error('Error details:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint
+    });
+    // Return empty array as fallback
+    return [];
+  }
+};
+
+// Function to fetch course enrollment counts
+export const fetchCourseEnrollmentCounts = async () => {
+  try {
+    console.log('Fetching course enrollment counts...');
+    const { data, error } = await supabase.rpc('get_course_enrollment_counts');
+    
+    if (error) {
+      console.error('RPC Error in fetchCourseEnrollmentCounts:', error);
+      throw error;
+    }
+    
+    console.log('Course enrollment counts data:', data);
+    
+    return data.map((item: any) => ({
+      courseId: item.course_id || '',
+      name: item.course_title || 'Unknown Course',
+      count: parseInt(item.total_enrollments) || 0,
+      completed: parseInt(item.completed_enrollments) || 0
+    }));
+  } catch (error: any) {
+    console.error('Error fetching course enrollment counts:', error);
+    console.error('Error details:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint
+    });
+    // Return empty array as fallback
+    return [];
+  }
+};
+
+// Function to fetch course difficulty distribution
+export const fetchCourseDifficultyDistribution = async () => {
+  try {
+    console.log('Fetching course difficulty distribution...');
+    const { data, error } = await supabase.rpc('get_course_difficulty_distribution');
+    
+    if (error) {
+      console.error('RPC Error in fetchCourseDifficultyDistribution:', error);
+      throw error;
+    }
+    
+    console.log('Course difficulty distribution data:', data);
+    
+    return data.map((item: any) => ({
+      name: item.level ? item.level.charAt(0).toUpperCase() + item.level.slice(1) : 'Unknown',
+      value: parseInt(item.count) || 0
+    }));
+  } catch (error: any) {
+    console.error('Error fetching course difficulty distribution:', error);
+    console.error('Error details:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint
+    });
+    // Return empty array as fallback
+    return [];
+  }
+};
+
+// Function to fetch content type distribution
+export const fetchContentTypeDistribution = async () => {
+  try {
+    console.log('Fetching content type distribution...');
+    const { data, error } = await supabase.rpc('get_content_type_distribution');
+    
+    if (error) {
+      console.error('RPC Error in fetchContentTypeDistribution:', error);
+      throw error;
+    }
+    
+    console.log('Content type distribution data:', data);
+    
+    return data.map((item: any) => ({
+      name: item.content_type ? item.content_type.charAt(0).toUpperCase() + item.content_type.slice(1) : 'Unknown',
+      value: parseInt(item.count) || 0
+    }));
+  } catch (error: any) {
+    console.error('Error fetching content type distribution:', error);
+    console.error('Error details:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint
+    });
+    // Return empty array as fallback
+    return [];
+  }
+};
