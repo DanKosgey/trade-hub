@@ -256,6 +256,67 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Automatically determine trade status based on P&L if provided
+      let status = formData.status || 'pending';
+      const pnl = formData.pnl ? Number(formData.pnl) : undefined;
+      
+      // If P&L is provided, automatically set status
+      if (pnl !== undefined) {
+        if (pnl > 0) {
+          status = 'win';
+        } else if (pnl < 0) {
+          status = 'loss';
+        } else {
+          status = 'breakeven';
+        }
+      }
+      
+      // If exit price is provided but P&L is not, calculate P&L
+      let calculatedPnl = pnl;
+      if (formData.exitPrice && formData.entryPrice && calculatedPnl === undefined) {
+        const entryPrice = Number(formData.entryPrice) || 0;
+        const exitPrice = Number(formData.exitPrice) || 0;
+        const type = formData.type || 'buy';
+        const pair = formData.pair || 'EURUSD';
+        const positionSize = formData.positionSize ? Number(formData.positionSize) : 1; // Default to 1 lot
+        
+        // Calculate P&L based on trade type and pair
+        let priceDifference = 0;
+        if (type === 'buy') {
+          priceDifference = exitPrice - entryPrice;
+        } else {
+          priceDifference = entryPrice - exitPrice;
+        }
+        
+        // Calculate pip value (simplified - in a real system this would be more complex)
+        // For most pairs, 1 pip = 0.0001; for JPY pairs, 1 pip = 0.01
+        const pipValue = pair.endsWith('JPY') ? 0.01 : 0.0001;
+        const pips = priceDifference / pipValue;
+        
+        // Standard lot = 100,000 units of base currency
+        // Mini lot = 10,000 units
+        // Micro lot = 1,000 units
+        // Nano lot = 100 units
+        calculatedPnl = pips * positionSize; // Simplified calculation
+        
+        // Set status based on calculated P&L
+        if (calculatedPnl > 0) {
+          status = 'win';
+        } else if (calculatedPnl < 0) {
+          status = 'loss';
+        } else {
+          status = 'breakeven';
+        }
+      }
+      
+      // Validate that manually entered status matches calculated P&L
+      if (pnl !== undefined && status !== formData.status) {
+        if (!window.confirm(`The calculated outcome based on P&L (${calculatedPnl >= 0 ? (calculatedPnl > 0 ? 'Win' : 'Breakeven') : 'Loss'}) doesn't match the manually entered status (${formData.status}). Do you want to use the calculated outcome?`)) {
+          // User chose to keep the manually entered status
+          status = formData.status;
+        }
+      }
+
       const entryData: Omit<TradeEntry, 'id'> = {
         pair: formData.pair || 'EURUSD',
         type: formData.type || 'buy',
@@ -263,12 +324,12 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
         stopLoss: Number(formData.stopLoss) || 0,
         takeProfit: Number(formData.takeProfit) || 0,
         exitPrice: formData.exitPrice ? Number(formData.exitPrice) : undefined,
-        status: formData.status || 'pending',
+        status: status, // Use calculated status
         validationResult: formData.validationResult || 'none',
         notes: formData.notes || '',
         date: formData.date || new Date().toISOString(),
         emotions: formData.emotions || [],
-        pnl: formData.pnl ? Number(formData.pnl) : undefined,
+        pnl: calculatedPnl, // Use calculated P&L if available
         screenshotUrl: formData.screenshotUrl || undefined,
         // Include new fields
         strategy: formData.strategy || undefined,

@@ -1,21 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
-import LandingPage from './components/LandingPage';
 import LoginPage from './components/LoginPage';
 import Dashboard from './components/Dashboard';
-import AITradeAssistant from './components/AITradeAssistant';
-import TradeJournal from './components/TradeJournal';
 import AdminPortal from './components/AdminPortal';
-import RuleBuilder from './components/RuleBuilder';
-import CourseBuilder from './components/CourseBuilder';
-import EliteApplicationForm from './components/EliteApplicationForm';
-import QuizPlayer from './components/QuizPlayer';
-import CommunityHub from './components/CommunityHub';
-import CourseManagementSystem from './components/enhanced/CourseManagementSystem';
-import { User, UserRole, CourseModule, TradeRule, TradeEntry, MentorshipApplication, StudentProfile } from './types';
-import { courseService } from './services/courseService';
-import { Lock, Settings, GraduationCap, BarChart, Bot, PlayCircle, CheckSquare, FileText, ArrowRight, ShieldAlert } from 'lucide-react';
+import AITradeAssistant from './components/AITradeAssistant';
 import { supabase } from './supabase/client';
+import { User, StudentProfile, TradeRule, TradeEntry, CourseModule, MentorshipApplication } from './types';
+import LandingPage from './components/LandingPage';
+import EliteApplicationForm from './components/EliteApplicationForm';
+import RuleBuilder from './components/RuleBuilder';
+import CourseManagementSystem from './components/enhanced/CourseManagementSystem';
+import { ShieldAlert, Settings, Bot, BarChart, CheckSquare, PlayCircle, ArrowRight } from 'lucide-react';
+import TradeJournal from './components/TradeJournal';
+import CommunityHub from './components/CommunityHub';
+import QuizPlayer from './components/QuizPlayer';
+import { courseService } from './services/courseService';
 
 // --- MOCK DATA ---
 
@@ -650,13 +649,15 @@ function App() {
         onChangeView={setPortalView}
         onLogout={handleLogout}
       >
-        {loadingCourses ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-trade-neon"></div>
-          </div>
-        ) : (
-          renderContent()
-        )}
+        <main className="flex-1 p-8">
+          {loadingCourses ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-trade-neon"></div>
+            </div>
+          ) : (
+            renderContent()
+          )}
+        </main>
       </Layout>
     );
   }

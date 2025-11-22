@@ -4,6 +4,12 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+    
+    // Log environment variables for debugging
+    console.log('Loaded environment variables:');
+    console.log('VITE_SUPABASE_URL:', env.VITE_SUPABASE_URL);
+    console.log('VITE_SUPABASE_ANON_KEY:', env.VITE_SUPABASE_ANON_KEY ? 'Present' : 'Missing');
+    
     return {
       server: {
         port: 3000,
@@ -12,7 +18,9 @@ export default defineConfig(({ mode }) => {
       plugins: [react()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        // VITE_ environment variables are automatically available in the client
+        // No need to explicitly define them
       },
       resolve: {
         alias: {

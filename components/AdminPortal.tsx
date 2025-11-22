@@ -1,13 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { StudentProfile, CourseModule, SubscriptionPlan, PlanFeature, CommunityLink, TradeRule } from '../types';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+
+import { StudentProfile, CourseModule, SubscriptionPlan, PlanFeature, CommunityLink, TradeRule, TradeEntry } from '../types';
 import CourseManagementSystem from './enhanced/CourseManagementSystem';
 import RuleBuilder from './RuleBuilder';
+import AdminTradeJournal from './AdminTradeJournal';
 import { socialMediaService } from '../services/socialMediaService';
 import { 
   Plus, Edit2, Trash2, Zap, Users, TrendingUp, AlertTriangle, 
   Search, ShieldAlert, ArrowUpRight, ArrowDownRight, BarChart2, 
   DollarSign, X, LayoutDashboard, BookOpen, Layers, PieChart as PieIcon, 
-  Activity, CreditCard, List as ListIcon, Grid as GridIcon, Mail, UserCheck 
+  Activity, CreditCard, List as ListIcon, Grid as GridIcon, Mail, UserCheck,
+  BarChart3
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
@@ -17,6 +20,8 @@ import {
   fetchAllStudents, fetchAllTrades, fetchBusinessMetrics, fetchStudentWithTrades,
   fetchRevenueGrowthData, fetchCourseCompletionData, fetchRuleViolationsData, fetchCourseEnrollmentCounts 
 } from '../services/adminService';
+import { supabase } from '../supabase/client';
+import { journalService } from '../services/journalService';
 
 // ============== TYPES ==============
 interface AdminPortalProps {
@@ -273,7 +278,7 @@ const StudentDetailModal: React.FC<{ student: StudentProfile; onClose: () => voi
 
 // ============== MAIN COMPONENT ==============
 const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overview' }) => {
-  const [activeTab, setActiveTab] = useState<'overview'|'trades'|'analytics'|'directory'|'settings'|'rules'|'content'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'overview'|'trades'|'analytics'|'directory'|'settings'|'rules'|'content'|'journal'|'admin-analytics'>(initialTab);
   const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -296,6 +301,9 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [tradeRules, setTradeRules] = useState<TradeRule[]>([]);
+  // Admin analytics state
+  const [adminTrades, setAdminTrades] = useState<TradeEntry[]>([]);
+  const [adminAnalyticsLoading, setAdminAnalyticsLoading] = useState(true);
 
   // Memoize the setTradeRules function to prevent unnecessary re-renders
   const setTradeRulesMemo = useCallback((rules: TradeRule[]) => {
@@ -363,6 +371,121 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
     return { total, wins, losses, winRate, netPnL, pairData: Object.entries(pairStats).map(([n, v]) => ({ name: n, value: v })).sort((a, b) => b.value - a.value) };
   })();
 
+  // Add useEffect to fetch admin trades for analytics
+  useEffect(() => {
+    const fetchAdminTrades = async () => {
+      if (activeTab !== 'admin-analytics') return;
+      
+      try {
+        setAdminAnalyticsLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const entries = await journalService.getJournalEntries(user.id);
+          setAdminTrades(entries);
+        }
+      } catch (err) {
+        console.error('Error fetching admin trades:', err);
+      } finally {
+        setAdminAnalyticsLoading(false);
+      }
+    };
+
+    fetchAdminTrades();
+  }, [activeTab]);
+
+  // Calculate admin analytics stats
+  const adminStats = useMemo(() => {
+    if (adminTrades.length === 0) {
+      return {
+        totalPnL: 0,
+        winRate: 0,
+        totalTrades: 0,
+        bestAsset: '-',
+        largestWin: 0,
+        largestLoss: 0,
+        profitFactor: 0,
+        pairStats: {} as Record<string, { wins: number; losses: number; pnl: number }>
+      };
+    }
+
+    const closedTrades = adminTrades.filter(t => t.status !== 'pending');
+    const wins = closedTrades.filter(t => t.status === 'win').length;
+    const losses = closedTrades.filter(t => t.status === 'loss').length;
+    const winRate = closedTrades.length > 0 ? Math.round((wins / closedTrades.length) * 100) : 0;
+    const totalPnL = adminTrades.reduce((sum, trade) => sum + (trade.pnl || 0), 0);
+    
+    const largestWin = Math.max(...adminTrades.filter(t => t.pnl && t.pnl > 0).map(t => t.pnl || 0), 0);
+    const largestLoss = Math.min(...adminTrades.filter(t => t.pnl && t.pnl < 0).map(t => t.pnl || 0), 0);
+    
+    const winSum = adminTrades.filter(t => t.status === 'win').reduce((sum, t) => sum + (t.pnl || 0), 0);
+    const lossSum = Math.abs(adminTrades.filter(t => t.status === 'loss').reduce((sum, t) => sum + (t.pnl || 0), 0));
+    const profitFactor = lossSum > 0 ? winSum / lossSum : 0;
+    
+    // Pair statistics
+    const pairStats: Record<string, { wins: number; losses: number; pnl: number }> = {};
+    adminTrades.forEach(trade => {
+      const pair = trade.pair || 'Unknown';
+      if (!pairStats[pair]) {
+        pairStats[pair] = { wins: 0, losses: 0, pnl: 0 };
+      }
+      if (trade.status === 'win') pairStats[pair].wins++;
+      if (trade.status === 'loss') pairStats[pair].losses++;
+      pairStats[pair].pnl += trade.pnl || 0;
+    });
+    
+    // Find best performing asset
+    const bestAsset = Object.entries(pairStats)
+      .sort(([, a], [, b]) => (b as { wins: number; losses: number; pnl: number }).pnl - (a as { wins: number; losses: number; pnl: number }).pnl)[0]?.[0] || '-';
+
+    return {
+      totalPnL,
+      winRate,
+      totalTrades: adminTrades.length,
+      bestAsset,
+      largestWin,
+      largestLoss,
+      profitFactor,
+      pairStats
+    };
+  }, [adminTrades]);
+
+  // Calculate P&L over time data for the chart
+  const pnlOverTimeData = useMemo(() => {
+    if (adminTrades.length === 0) return [];
+    
+    // Group trades by date and calculate cumulative P&L
+    const tradesByDate: Record<string, number> = {};
+    
+    // Sort trades by date
+    const sortedTrades = [...adminTrades].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    
+    // Calculate daily P&L
+    sortedTrades.forEach(trade => {
+      const date = new Date(trade.date).toLocaleDateString();
+      if (!tradesByDate[date]) {
+        tradesByDate[date] = 0;
+      }
+      tradesByDate[date] += trade.pnl || 0;
+    });
+    
+    // Convert to array and calculate cumulative P&L
+    const dates = Object.keys(tradesByDate).sort((a, b) => 
+      new Date(a).getTime() - new Date(b).getTime()
+    );
+    
+    let cumulativePnL = 0;
+    return dates.map(date => {
+      cumulativePnL += tradesByDate[date];
+      return {
+        date,
+        dailyPnL: tradesByDate[date],
+        cumulativePnL
+      };
+    });
+  }, [adminTrades]);
+
   const handleCreateCommunityLink = async (link: any) => { const n = await socialMediaService.createCommunityLink(link); if (n) { setCommunityLinks(p => [...p, n]); setShowCommunityLinkForm(false); } };
   const handleUpdateCommunityLink = async (id: string, u: any) => { if (await socialMediaService.updateCommunityLink(id, u)) { setCommunityLinks(p => p.map(l => l.id === id ? { ...l, ...u } : l)); setEditingCommunityLink(null); } };
   const handleDeleteCommunityLink = async (id: string) => { if (window.confirm('Delete?') && await socialMediaService.deleteCommunityLink(id)) setCommunityLinks(p => p.filter(l => l.id !== id)); };
@@ -381,6 +504,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
     { id: 'analytics', label: 'Analytics', icon: PieIcon },
     { id: 'content', label: 'Content Mgmt', icon: BookOpen },
     { id: 'rules', label: 'Rule Engine', icon: Zap },
+    { id: 'journal', label: 'My Trades', icon: DollarSign },
+    { id: 'admin-analytics', label: 'Admin Analytics', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: CreditCard },
   ] as const;
 
@@ -615,6 +740,13 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
         </div>
       )}
 
+      {/* ADMIN TRADE JOURNAL TAB */}
+      {activeTab === 'journal' && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <AdminTradeJournal />
+        </div>
+      )}
+
       {/* SETTINGS TAB */}
       {activeTab === 'settings' && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -671,6 +803,207 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
               {!plans.length && <div className="col-span-full text-center py-12 bg-trade-dark border border-gray-700 border-dashed rounded-xl"><p className="text-gray-500">No plans yet.</p></div>}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ADMIN ANALYTICS TAB */}
+      {activeTab === 'admin-analytics' && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center gap-2 text-2xl font-bold mb-6">
+            <BarChart3 className="h-8 w-8 text-trade-neon" /> Admin Trade Analytics
+          </div>
+          
+          {adminAnalyticsLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="flex flex-col items-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-trade-neon"></div>
+                <p className="mt-4 text-gray-400">Loading analytics...</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
+                  <div className="flex items-center gap-2 text-gray-400 mb-2">
+                    <DollarSign className="h-5 w-5" /> My Total P&L
+                  </div>
+                  <div className={`text-3xl font-bold ${adminStats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {adminStats.totalPnL >= 0 ? '+' : ''}${adminStats.totalPnL.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">All time performance</div>
+                </div>
+                
+                <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
+                  <div className="flex items-center gap-2 text-gray-400 mb-2">
+                    <TrendingUp className="h-5 w-5" /> Win Rate
+                  </div>
+                  <div className="text-3xl font-bold text-blue-400">{adminStats.winRate}%</div>
+                  <div className="text-xs text-gray-500 mt-1">Based on closed trades</div>
+                </div>
+                
+                <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
+                  <div className="flex items-center gap-2 text-gray-400 mb-2">
+                    <BarChart2 className="h-5 w-5" /> Total Trades
+                  </div>
+                  <div className="text-3xl font-bold text-purple-400">{adminStats.totalTrades}</div>
+                  <div className="text-xs text-gray-500 mt-1">Closed positions</div>
+                </div>
+                
+                <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
+                  <div className="flex items-center gap-2 text-gray-400 mb-2">
+                    <ArrowUpRight className="h-5 w-5" /> Best Asset
+                  </div>
+                  <div className="text-3xl font-bold text-yellow-400">{adminStats.bestAsset}</div>
+                  <div className="text-xs text-gray-500 mt-1">Highest P&L pair</div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
+                  <h3 className="font-bold text-lg mb-6">P&L Over Time</h3>
+                  <div className="h-64">
+                    {pnlOverTimeData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={pnlOverTimeData}>
+                          <defs>
+                            <linearGradient id="colorPnL" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={adminStats.totalPnL >= 0 ? "#10b981" : "#ef4444"} stopOpacity={0.8}/>
+                              <stop offset="95%" stopColor={adminStats.totalPnL >= 0 ? "#10b981" : "#ef4444"} stopOpacity={0.1}/>
+                            </linearGradient>
+                          </defs>
+                          <XAxis 
+                            dataKey="date" 
+                            stroke="#64748b" 
+                            fontSize={12}
+                            tickFormatter={(value) => {
+                              const date = new Date(value);
+                              return `${date.getMonth() + 1}/${date.getDate()}`;
+                            }}
+                          />
+                          <YAxis 
+                            stroke="#64748b" 
+                            fontSize={12}
+                            tickFormatter={(value) => `$${value}`}
+                          />
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                          <Tooltip 
+                            contentStyle={{backgroundColor:'#0f172a',border:'1px solid #334155',borderRadius:'8px'}}
+                            formatter={(value) => [`$${Number(value).toFixed(2)}`, 'P&L']}
+                            labelFormatter={(label) => `Date: ${label}`}
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="cumulativePnL" 
+                            stroke={adminStats.totalPnL >= 0 ? "#10b981" : "#ef4444"} 
+                            fillOpacity={1} 
+                            fill="url(#colorPnL)" 
+                            name="Cumulative P&L"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-500">
+                        No trade data available
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
+                  <h3 className="font-bold text-lg mb-6">Performance by Asset</h3>
+                  <div className="h-64 bg-gray-900/50 rounded-lg overflow-y-auto">
+                    {Object.keys(adminStats.pairStats).length > 0 ? (
+                      <div className="space-y-3">
+                        {Object.entries(adminStats.pairStats)
+                          .sort(([, a], [, b]) => (b as { wins: number; losses: number; pnl: number }).pnl - (a as { wins: number; losses: number; pnl: number }).pnl)
+                          .map(([pair, stats]) => (
+                            <div key={pair} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
+                              <div>
+                                <div className="font-medium text-white">{pair}</div>
+                                <div className="text-xs text-gray-400">{(stats as { wins: number; losses: number; pnl: number }).wins}W / {(stats as { wins: number; losses: number; pnl: number }).losses}L</div>
+                              </div>
+                              <div className={`font-bold ${(stats as { wins: number; losses: number; pnl: number }).pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                ${(stats as { wins: number; losses: number; pnl: number }).pnl.toFixed(2)}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-500">
+                        No trade data available
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
+                <h3 className="font-bold text-lg mb-6">Recent Trades</h3>
+                <div className="bg-gray-900/50 rounded-lg overflow-hidden">
+                  {adminTrades.length > 0 ? (
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-gray-800 text-gray-400">
+                        <tr>
+                          <th className="p-4">Date</th>
+                          <th className="p-4">Pair</th>
+                          <th className="p-4">Type</th>
+                          <th className="p-4 text-right">P&L</th>
+                          <th className="p-4 text-center">Result</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-700">
+                        {adminTrades.slice(0, 10).map((trade) => (
+                          <tr key={trade.id} className="hover:bg-gray-800/50">
+                            <td className="p-4 text-gray-400">
+                              {new Date(trade.date).toLocaleDateString()}
+                            </td>
+                            <td className="p-4 font-bold">{trade.pair}</td>
+                            <td className="p-4">
+                              <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                                trade.type === 'buy' 
+                                  ? 'bg-green-500/20 text-green-400' 
+                                  : 'bg-red-500/20 text-red-400'
+                              }`}>
+                                {trade.type}
+                              </span>
+                            </td>
+                            <td className={`p-4 text-right font-bold ${
+                              (trade.pnl || 0) > 0 
+                                ? 'text-green-400' 
+                                : (trade.pnl || 0) < 0 
+                                  ? 'text-red-400' 
+                                  : 'text-gray-500'
+                            }`}>
+                              {trade.pnl !== undefined 
+                                ? (trade.pnl > 0 ? `+$${trade.pnl.toFixed(2)}` : `$${trade.pnl.toFixed(2)}`) 
+                                : '-'}
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                                trade.status === 'win' 
+                                  ? 'bg-green-500/20 text-green-400' 
+                                  : trade.status === 'loss' 
+                                    ? 'bg-red-500/20 text-red-400' 
+                                    : trade.status === 'breakeven' 
+                                      ? 'bg-yellow-500/20 text-yellow-400' 
+                                      : 'bg-gray-500/20 text-gray-400'
+                              }`}>
+                                {trade.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="p-8 text-center text-gray-500">
+                      No trades recorded yet. Start by adding your first trade in the "My Trades" section.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
