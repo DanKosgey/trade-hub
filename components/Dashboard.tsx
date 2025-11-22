@@ -6,18 +6,24 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
   AreaChart, Area, CartesianGrid 
 } from 'recharts';
+import { fetchStudentWithTrades } from '../services/adminService';
+import { supabase } from '../supabase/client';
 
 interface DashboardProps {
   user: User;
   courses: CourseModule[];
-  trades: TradeEntry[];
   onContinueCourse: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, courses, trades, onContinueCourse }) => {
+const Dashboard: React.FC<DashboardProps> = ({ user, courses, onContinueCourse }) => {
   const completedCount = courses.filter(c => c.completed).length;
   const totalCount = courses.length;
   const percent = Math.round((completedCount / totalCount) * 100);
+
+  // State for real trade data
+  const [trades, setTrades] = useState<TradeEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // --- Market Status Timer Logic ---
   const [marketStatus, setMarketStatus] = useState<{isOpen: boolean; label: string; subtext: string}>({
@@ -25,6 +31,100 @@ const Dashboard: React.FC<DashboardProps> = ({ user, courses, trades, onContinue
     label: 'Calculating...',
     subtext: 'Checking market hours...'
   });
+
+  // Fetch real trade data for the student
+  useEffect(() => {
+    const fetchTrades = async () => {
+      try {
+        setLoading(true);
+        const studentData = await fetchStudentWithTrades(user.id);
+        if (studentData) {
+          setTrades(studentData.recentTrades);
+        }
+      } catch (err) {
+        console.error('Error fetching trades:', err);
+        setError('Failed to load trade data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTrades();
+
+    // Set up real-time subscription for trade changes
+    const channel = supabase
+      .channel('trades-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'journal_entries',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          // Add new trade to the list
+          const newTrade: TradeEntry = {
+            id: payload.new.id,
+            pair: payload.new.pair,
+            type: payload.new.type,
+            entryPrice: payload.new.entry_price,
+            stopLoss: payload.new.stop_loss,
+            takeProfit: payload.new.take_profit,
+            status: payload.new.status,
+            validationResult: payload.new.validation_result,
+            notes: payload.new.notes,
+            date: payload.new.date,
+            pnl: payload.new.pnl
+          };
+          setTrades(prev => [newTrade, ...prev]);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'journal_entries',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          // Update existing trade
+          const updatedTrade: TradeEntry = {
+            id: payload.new.id,
+            pair: payload.new.pair,
+            type: payload.new.type,
+            entryPrice: payload.new.entry_price,
+            stopLoss: payload.new.stop_loss,
+            takeProfit: payload.new.take_profit,
+            status: payload.new.status,
+            validationResult: payload.new.validation_result,
+            notes: payload.new.notes,
+            date: payload.new.date,
+            pnl: payload.new.pnl
+          };
+          setTrades(prev => prev.map(trade => trade.id === updatedTrade.id ? updatedTrade : trade));
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'journal_entries',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          // Remove deleted trade
+          setTrades(prev => prev.filter(trade => trade.id !== payload.old.id));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user.id]);
 
   useEffect(() => {
     const updateMarketStatus = () => {
@@ -162,207 +262,233 @@ const Dashboard: React.FC<DashboardProps> = ({ user, courses, trades, onContinue
         </div>
       </div>
 
-      {/* Top Level Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        {/* Course Progress */}
-        <div className="bg-trade-dark p-5 md:p-6 rounded-xl border border-gray-700 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-             <Award className="h-16 w-16 text-blue-500" />
-          </div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-blue-500/20 rounded text-blue-400"><Award className="h-5 w-5" /></div>
-            <span className="text-gray-400 text-sm">Course Progress</span>
-          </div>
-          <div className="text-3xl font-bold mb-2">{percent}%</div>
-          <div className="w-full bg-gray-700 h-2 rounded-full mt-3">
-            <div className="bg-blue-500 h-2 rounded-full transition-all duration-500" style={{ width: `${percent}%` }}></div>
-          </div>
+      {/* Loading State */}
+      {loading && (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-trade-neon"></div>
         </div>
+      )}
 
-        {/* Win Rate */}
-        <div className="bg-trade-dark p-5 md:p-6 rounded-xl border border-gray-700 relative overflow-hidden">
-           <div className="absolute top-0 right-0 p-4 opacity-10">
-             <Activity className="h-16 w-16 text-emerald-500" />
-          </div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-emerald-500/20 rounded text-emerald-400"><Activity className="h-5 w-5" /></div>
-            <span className="text-gray-400 text-sm">Win Rate</span>
-          </div>
-          <div className="text-3xl font-bold">{stats.winRate}%</div>
-          <p className={`text-xs mt-1 font-medium ${stats.totalPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {stats.totalPnL >= 0 ? '+' : ''}${stats.totalPnL} Net P&L
-          </p>
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-6 text-center">
+          <p className="text-red-200">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white"
+          >
+            Retry
+          </button>
         </div>
+      )}
 
-        {/* Profit Factor */}
-        <div className="bg-trade-dark p-5 md:p-6 rounded-xl border border-gray-700 relative overflow-hidden">
-           <div className="absolute top-0 right-0 p-4 opacity-10">
-             <TrendingUp className="h-16 w-16 text-purple-500" />
-          </div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-purple-500/20 rounded text-purple-400"><TrendingUp className="h-5 w-5" /></div>
-            <span className="text-gray-400 text-sm">Profit Factor</span>
-          </div>
-          <div className="text-3xl font-bold">{stats.profitFactor}</div>
-          <p className="text-xs text-gray-500 mt-1">Target: &gt; 2.0</p>
-        </div>
-        
-        {/* Continue Action */}
-        <div className="bg-gradient-to-br from-trade-accent to-blue-700 p-5 md:p-6 rounded-xl border border-blue-500 shadow-lg shadow-blue-900/20 cursor-pointer hover:scale-[1.02] transition flex flex-col justify-center" onClick={onContinueCourse}>
-          <h3 className="font-bold text-lg mb-1 text-white">Continue Learning</h3>
-          <p className="text-blue-100 text-sm mb-4 opacity-80">Next: Liquidity Concepts</p>
-          <div className="flex items-center text-white font-bold text-sm bg-white/20 w-fit px-3 py-2 rounded-lg hover:bg-white/30 transition">
-            Resume Module <PlayCircle className="ml-2 h-4 w-4" />
-          </div>
-        </div>
-      </div>
+      {/* Main Content */}
+      {!loading && !error && (
+        <>
+          {/* Top Level Stats Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {/* Course Progress */}
+            <div className="bg-trade-dark p-5 md:p-6 rounded-xl border border-gray-700 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                 <Award className="h-16 w-16 text-blue-500" />
+              </div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-blue-500/20 rounded text-blue-400"><Award className="h-5 w-5" /></div>
+                <span className="text-gray-400 text-sm">Course Progress</span>
+              </div>
+              <div className="text-3xl font-bold mb-2">{percent}%</div>
+              <div className="w-full bg-gray-700 h-2 rounded-full mt-3">
+                <div className="bg-blue-500 h-2 rounded-full transition-all duration-500" style={{ width: `${percent}%` }}></div>
+              </div>
+            </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Equity Curve */}
-        <div className="lg:col-span-2 bg-trade-dark p-4 md:p-6 rounded-xl border border-gray-700">
-          <div className="flex justify-between items-center mb-6">
-             <h3 className="font-bold text-lg flex items-center gap-2">
-               <TrendingUp className="h-5 w-5 text-trade-neon" /> Account Growth
-             </h3>
-             <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">All Time</span>
-          </div>
-          <div className="h-64 md:h-80" style={{minHeight: '200px'}}>
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <AreaChart data={stats.equityCurveData} width={undefined} height={undefined}>
-                <defs>
-                  <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00ff94" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#00ff94" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
-                <XAxis dataKey="date" stroke="#64748b" fontSize={12} tickMargin={10} />
-                <YAxis stroke="#64748b" fontSize={12} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px' }}
-                  labelStyle={{ color: '#94a3b8' }}
-                  itemStyle={{ color: '#f8fafc' }}
-                />
-                <Area type="monotone" dataKey="equity" stroke="#00ff94" strokeWidth={3} fillOpacity={1} fill="url(#colorEquity)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+            {/* Win Rate */}
+            <div className="bg-trade-dark p-5 md:p-6 rounded-xl border border-gray-700 relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-4 opacity-10">
+                 <Activity className="h-16 w-16 text-emerald-500" />
+              </div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-emerald-500/20 rounded text-emerald-400"><Activity className="h-5 w-5" /></div>
+                <span className="text-gray-400 text-sm">Win Rate</span>
+              </div>
+              <div className="text-3xl font-bold">{stats.winRate}%</div>
+              <p className={`text-xs mt-1 font-medium ${stats.totalPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {stats.totalPnL >= 0 ? '+' : ''}${stats.totalPnL} Net P&L
+              </p>
+            </div>
 
-        {/* Detailed Stats Column */}
-        <div className="space-y-6">
-          <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-            <h3 className="font-bold text-lg mb-4">Performance Metrics</h3>
-            <div className="space-y-4">
-                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-green-500/20 p-2 rounded text-green-400"><DollarSign className="h-4 w-4" /></div>
-                        <span className="text-sm text-gray-300">Avg Win</span>
-                    </div>
-                    <span className="font-bold text-green-400">${stats.avgWin}</span>
-                </div>
-                
-                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-red-500/20 p-2 rounded text-red-400"><TrendingDown className="h-4 w-4" /></div>
-                        <span className="text-sm text-gray-300">Avg Loss</span>
-                    </div>
-                    <span className="font-bold text-red-400">${stats.avgLoss}</span>
-                </div>
-
-                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg border border-red-900/30">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-red-500/20 p-2 rounded text-red-400"><Percent className="h-4 w-4" /></div>
-                        <span className="text-sm text-gray-300">Max Drawdown</span>
-                    </div>
-                    <span className="font-bold text-red-400">-${stats.maxDrawdown}</span>
-                </div>
-
-                <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-blue-500/20 p-2 rounded text-blue-400"><Activity className="h-4 w-4" /></div>
-                        <span className="text-sm text-gray-300">Total Trades</span>
-                    </div>
-                    <span className="font-bold text-white">{stats.totalTrades}</span>
-                </div>
+            {/* Profit Factor */}
+            <div className="bg-trade-dark p-5 md:p-6 rounded-xl border border-gray-700 relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-4 opacity-10">
+                 <TrendingUp className="h-16 w-16 text-purple-500" />
+              </div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-purple-500/20 rounded text-purple-400"><TrendingUp className="h-5 w-5" /></div>
+                <span className="text-gray-400 text-sm">Profit Factor</span>
+              </div>
+              <div className="text-3xl font-bold">{stats.profitFactor}</div>
+              <p className="text-xs text-gray-500 mt-1">Target: &gt; 2.0</p>
+            </div>
+            
+            {/* Continue Action */}
+            <div className="bg-gradient-to-br from-trade-accent to-blue-700 p-5 md:p-6 rounded-xl border border-blue-500 shadow-lg shadow-blue-900/20 cursor-pointer hover:scale-[1.02] transition flex flex-col justify-center" onClick={onContinueCourse}>
+              <h3 className="font-bold text-lg mb-1 text-white">Continue Learning</h3>
+              <p className="text-blue-100 text-sm mb-4 opacity-80">Next: Liquidity Concepts</p>
+              <div className="flex items-center text-white font-bold text-sm bg-white/20 w-fit px-3 py-2 rounded-lg hover:bg-white/30 transition">
+                Resume Module <PlayCircle className="ml-2 h-4 w-4" />
+              </div>
             </div>
           </div>
 
-          {/* Weekly P&L Distribution */}
-          <div className="bg-trade-dark p-6 rounded-xl border border-gray-700 flex-1">
-             <h3 className="font-bold text-sm text-gray-400 mb-4 uppercase tracking-wider">Recent Trades P&L</h3>
-             <div className="h-40" style={{minHeight: '150px'}}>
+          {/* Charts Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* Equity Curve */}
+            <div className="lg:col-span-2 bg-trade-dark p-4 md:p-6 rounded-xl border border-gray-700">
+              <div className="flex justify-between items-center mb-6">
+                 <h3 className="font-bold text-lg flex items-center gap-2">
+                   <TrendingUp className="h-5 w-5 text-trade-neon" /> Account Growth
+                 </h3>
+                 <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">All Time</span>
+              </div>
+              <div className="h-64 md:h-80" style={{minHeight: '200px'}}>
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                    <BarChart data={stats.equityCurveData.slice(-7)} width={undefined} height={undefined}>
-                        <Bar dataKey="pnl" radius={[2, 2, 2, 2]}>
-                        {stats.equityCurveData.slice(-7).map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10b981' : '#ef4444'} />
-                        ))}
-                        </Bar>
-                        <Tooltip cursor={{fill: 'transparent'}} contentStyle={{backgroundColor: '#1e293b', borderRadius: '8px', border: 'none'}} />
-                    </BarChart>
+                  <AreaChart data={stats.equityCurveData} width={undefined} height={undefined}>
+                    <defs>
+                      <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#00ff94" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#00ff94" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                    <XAxis dataKey="date" stroke="#64748b" fontSize={12} tickMargin={10} />
+                    <YAxis stroke="#64748b" fontSize={12} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px' }}
+                      labelStyle={{ color: '#94a3b8' }}
+                      itemStyle={{ color: '#f8fafc' }}
+                    />
+                    <Area type="monotone" dataKey="equity" stroke="#00ff94" strokeWidth={3} fillOpacity={1} fill="url(#colorEquity)" />
+                  </AreaChart>
                 </ResponsiveContainer>
-             </div>
-          </div>
-        </div>
-      </div>
+              </div>
+            </div>
 
-      {/* Insights & Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="bg-trade-dark p-6 rounded-xl border border-gray-700 flex flex-col">
-            <h3 className="font-bold text-lg mb-6">AI Recommendations</h3>
-            <div className="space-y-4">
-              <div className="bg-blue-900/20 p-4 rounded-lg border-l-4 border-blue-500 flex justify-between items-start gap-3">
-                <div>
-                  <h4 className="font-semibold text-sm text-blue-200 flex items-center gap-2">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                    </span>
-                    Upcoming Live Session
-                  </h4>
-                  <p className="text-xs text-gray-400 mt-1">"NFP Preparation & Setup Review"</p>
-                  <p className="text-[10px] text-gray-500 mt-2 font-mono">Tomorrow, 10:00 AM EST</p>
+            {/* Detailed Stats Column */}
+            <div className="space-y-6">
+              <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
+                <h3 className="font-bold text-lg mb-4">Performance Metrics</h3>
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-green-500/20 p-2 rounded text-green-400"><DollarSign className="h-4 w-4" /></div>
+                            <span className="text-sm text-gray-300">Avg Win</span>
+                        </div>
+                        <span className="font-bold text-green-400">${stats.avgWin}</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-red-500/20 p-2 rounded text-red-400"><TrendingDown className="h-4 w-4" /></div>
+                            <span className="text-sm text-gray-300">Avg Loss</span>
+                        </div>
+                        <span className="font-bold text-red-400">${stats.avgLoss}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg border border-red-900/30">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-red-500/20 p-2 rounded text-red-400"><Percent className="h-4 w-4" /></div>
+                            <span className="text-sm text-gray-300">Max Drawdown</span>
+                        </div>
+                        <span className="font-bold text-red-400">-${stats.maxDrawdown}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-blue-500/20 p-2 rounded text-blue-400"><Activity className="h-4 w-4" /></div>
+                            <span className="text-sm text-gray-300">Total Trades</span>
+                        </div>
+                        <span className="font-bold text-white">{stats.totalTrades}</span>
+                    </div>
                 </div>
-                <button 
-                  onClick={() => handleAddToCalendar("NFP Prep - Mbauni Protocol Live", nextSessionDate)}
-                  className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg transition shadow-lg shadow-blue-900/20 flex flex-col items-center gap-1 min-w-[60px]"
-                  title="Add to Google Calendar"
-                >
-                  <CalendarPlus className="h-5 w-5" />
-                  <span className="text-[9px] font-bold uppercase">Add</span>
-                </button>
               </div>
 
-              <div className="bg-gray-800/50 p-4 rounded-lg border-l-4 border-yellow-500 flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0" />
-                <div>
-                  <h4 className="font-semibold text-sm text-gray-200">Avg Loss Too High</h4>
-                  <p className="text-xs text-gray-400 mt-1">Your average loss (${stats.avgLoss}) is 60% of your average win. Aim for &lt; 50%.</p>
-                </div>
+              {/* Weekly P&L Distribution */}
+              <div className="bg-trade-dark p-6 rounded-xl border border-gray-700 flex-1">
+                 <h3 className="font-bold text-sm text-gray-400 mb-4 uppercase tracking-wider">Recent Trades P&L</h3>
+                 <div className="h-40" style={{minHeight: '150px'}}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                        <BarChart data={stats.equityCurveData.slice(-7)} width={undefined} height={undefined}>
+                            <Bar dataKey="pnl" radius={[2, 2, 2, 2]}>
+                            {stats.equityCurveData.slice(-7).map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#10b981' : '#ef4444'} />
+                            ))}
+                            </Bar>
+                            <Tooltip cursor={{fill: 'transparent'}} contentStyle={{backgroundColor: '#1e293b', borderRadius: '8px', border: 'none'}} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                 </div>
               </div>
             </div>
           </div>
 
-          <div className={`p-6 rounded-xl border flex flex-col items-center justify-center text-center transition-colors duration-500 ${
-            marketStatus.isOpen 
-              ? 'bg-gradient-to-br from-green-900/40 to-black border-green-800' 
-              : 'bg-gradient-to-br from-gray-900 to-black border-gray-800'
-          }`}>
-             <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
-               marketStatus.isOpen ? 'bg-green-500/20 text-green-500 animate-pulse' : 'bg-trade-neon/10 text-trade-neon'
-             }`}>
-                <Clock className="h-8 w-8" />
-             </div>
-             <h3 className="font-bold text-xl mb-2">{marketStatus.label}</h3>
-             <p className="text-gray-400 text-sm max-w-xs mb-6">{marketStatus.subtext}</p>
-             <button onClick={onContinueCourse} className="text-trade-neon font-bold text-sm hover:underline">
-                Review Pre-Market Routine &rarr;
-             </button>
+          {/* Insights & Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="bg-trade-dark p-6 rounded-xl border border-gray-700 flex flex-col">
+                <h3 className="font-bold text-lg mb-6">AI Recommendations</h3>
+                <div className="space-y-4">
+                  <div className="bg-blue-900/20 p-4 rounded-lg border-l-4 border-blue-500 flex justify-between items-start gap-3">
+                    <div>
+                      <h4 className="font-semibold text-sm text-blue-200 flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                        </span>
+                        Upcoming Live Session
+                      </h4>
+                      <p className="text-xs text-gray-400 mt-1">"NFP Preparation & Setup Review"</p>
+                      <p className="text-[10px] text-gray-500 mt-2 font-mono">Tomorrow, 10:00 AM EST</p>
+                    </div>
+                    <button 
+                      onClick={() => handleAddToCalendar("NFP Prep - Mbauni Protocol Live", nextSessionDate)}
+                      className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg transition shadow-lg shadow-blue-900/20 flex flex-col items-center gap-1 min-w-[60px]"
+                      title="Add to Google Calendar"
+                    >
+                      <CalendarPlus className="h-5 w-5" />
+                      <span className="text-[9px] font-bold uppercase">Add</span>
+                    </button>
+                  </div>
+
+                  <div className="bg-gray-800/50 p-4 rounded-lg border-l-4 border-yellow-500 flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0" />
+                    <div>
+                      <h4 className="font-semibold text-sm text-gray-200">Avg Loss Too High</h4>
+                      <p className="text-xs text-gray-400 mt-1">Your average loss (${stats.avgLoss}) is 60% of your average win. Aim for &lt; 50%.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`p-6 rounded-xl border flex flex-col items-center justify-center text-center transition-colors duration-500 ${
+                marketStatus.isOpen 
+                  ? 'bg-gradient-to-br from-green-900/40 to-black border-green-800' 
+                  : 'bg-gradient-to-br from-gray-900 to-black border-gray-800'
+              }`}>
+                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
+                   marketStatus.isOpen ? 'bg-green-500/20 text-green-500 animate-pulse' : 'bg-trade-neon/10 text-trade-neon'
+                 }`}>
+                    <Clock className="h-8 w-8" />
+                 </div>
+                 <h3 className="font-bold text-xl mb-2">{marketStatus.label}</h3>
+                 <p className="text-gray-400 text-sm max-w-xs mb-6">{marketStatus.subtext}</p>
+                 <button onClick={onContinueCourse} className="text-trade-neon font-bold text-sm hover:underline">
+                    Review Pre-Market Routine &rarr;
+                 </button>
+              </div>
           </div>
-      </div>
+        </>
+      )}
+      
     </div>
   );
 };

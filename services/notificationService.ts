@@ -23,6 +23,16 @@ export interface NotificationPreferences {
   updatedAt: Date;
 }
 
+// Default notification preferences for new users
+const DEFAULT_NOTIFICATION_PREFERENCES: Omit<NotificationPreferences, 'profileId' | 'updatedAt'> = {
+  emailNotifications: true,
+  pushNotifications: true,
+  courseUpdates: true,
+  moduleUpdates: true,
+  quizReminders: true,
+  progressReminders: true
+};
+
 export const notificationService = {
   // Get notifications for a user
   async getNotifications(profileId: string): Promise<Notification[]> {
@@ -39,9 +49,9 @@ export const notificationService = {
         .select('*')
         .eq('profile_id', profileId)
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      
+
       return data.map(notification => ({
         id: notification.id,
         profileId: notification.profile_id,
@@ -66,7 +76,7 @@ export const notificationService = {
         .from('notifications')
         .update({ read: true })
         .eq('id', notificationId);
-      
+
       if (error) throw error;
       return true;
     } catch (error) {
@@ -90,7 +100,7 @@ export const notificationService = {
         .update({ read: true })
         .eq('profile_id', profileId)
         .eq('read', false);
-      
+
       if (error) throw error;
       return true;
     } catch (error) {
@@ -106,7 +116,7 @@ export const notificationService = {
         .from('notifications')
         .delete()
         .eq('id', notificationId);
-      
+
       if (error) throw error;
       return true;
     } catch (error) {
@@ -130,7 +140,7 @@ export const notificationService = {
         .select('*', { count: 'exact' })
         .eq('profile_id', profileId)
         .eq('read', false);
-      
+
       if (error) throw error;
       return count || 0;
     } catch (error) {
@@ -153,10 +163,25 @@ export const notificationService = {
         .from('notification_preferences')
         .select('*')
         .eq('profile_id', profileId)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single to handle cases where no preferences exist
+
+      if (error) {
+        console.error('Error fetching notification preferences:', error);
+        // If it's a "no rows" error, we'll create default preferences
+        if (error.code === 'PGRST116') {
+          // Create default preferences for the user
+          const defaultPreferences = await this.createDefaultPreferences(profileId);
+          return defaultPreferences;
+        }
+        return null;
+      }
       
-      if (error) throw error;
-      
+      // If no preferences exist, create default ones
+      if (!data) {
+        const defaultPreferences = await this.createDefaultPreferences(profileId);
+        return defaultPreferences;
+      }
+
       return {
         profileId: data.profile_id,
         emailNotifications: data.email_notifications,
@@ -169,6 +194,36 @@ export const notificationService = {
       };
     } catch (error) {
       console.error('Error fetching notification preferences:', error);
+      return null;
+    }
+  },
+
+  // Create default notification preferences for a user
+  async createDefaultPreferences(profileId: string): Promise<NotificationPreferences | null> {
+    try {
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .insert({
+          profile_id: profileId,
+          ...DEFAULT_NOTIFICATION_PREFERENCES
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        profileId: data.profile_id,
+        emailNotifications: data.email_notifications,
+        pushNotifications: data.push_notifications,
+        courseUpdates: data.course_updates,
+        moduleUpdates: data.module_updates,
+        quizReminders: data.quiz_reminders,
+        progressReminders: data.progress_reminders,
+        updatedAt: new Date(data.updated_at)
+      };
+    } catch (error) {
+      console.error('Error creating default notification preferences:', error);
       return null;
     }
   },
@@ -200,7 +255,7 @@ export const notificationService = {
         }, {
           onConflict: 'profile_id'
         });
-      
+
       if (error) throw error;
       return true;
     } catch (error) {
@@ -222,7 +277,7 @@ export const notificationService = {
         updater_name: updaterName,
         update_type: updateType
       });
-      
+
       if (error) throw error;
       return true;
     } catch (error) {
@@ -242,7 +297,7 @@ export const notificationService = {
         module_id: moduleId,
         updater_name: updaterName
       });
-      
+
       if (error) throw error;
       return true;
     } catch (error) {

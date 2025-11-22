@@ -398,7 +398,6 @@ function App() {
             <Dashboard
               user={user}
               courses={courses}
-              trades={journalEntries}
               onContinueCourse={() => setPortalView('courses')}
             />
           );

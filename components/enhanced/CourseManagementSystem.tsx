@@ -13,6 +13,7 @@ import CourseExportImport from './CourseExportImport';
 import CourseVersioning from './CourseVersioning';
 import NotificationSystem from './NotificationSystem';
 import CategoryManager from './CategoryManager';
+import { supabase } from '../../supabase/client';
 import { 
   BookOpen, Users, BarChart3, Settings, 
   Download, Bell, User, TrendingUp
@@ -54,6 +55,96 @@ const CourseManagementSystem: React.FC<CourseManagementSystemProps> = ({
       loadNotifications();
       loadNotificationPreferences();
     }
+  }, [currentUser.id]);
+
+  // Set up real-time subscription for notifications
+  useEffect(() => {
+    // Only set up real-time for real users with valid UUIDs
+    const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(currentUser.id) && currentUser.id !== '00000000-0000-0000-0000-000000000000';
+    if (!isValidUuid) return;
+
+    // Set up real-time subscription for notifications
+    const channel = supabase
+      .channel('notifications-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `profile_id=eq.${currentUser.id}`
+        },
+        (payload) => {
+          // Add new notification to the list
+          const newNotification: Notification = {
+            id: payload.new.id,
+            profileId: payload.new.profile_id,
+            title: payload.new.title,
+            message: payload.new.message,
+            type: payload.new.type,
+            read: payload.new.read,
+            courseId: payload.new.course_id,
+            moduleId: payload.new.module_id,
+            createdAt: new Date(payload.new.created_at)
+          };
+          setNotifications(prev => [newNotification, ...prev]);
+          setUnreadCount(prev => prev + 1);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `profile_id=eq.${currentUser.id}`
+        },
+        (payload) => {
+          // Update existing notification
+          const updatedNotification: Notification = {
+            id: payload.new.id,
+            profileId: payload.new.profile_id,
+            title: payload.new.title,
+            message: payload.new.message,
+            type: payload.new.type,
+            read: payload.new.read,
+            courseId: payload.new.course_id,
+            moduleId: payload.new.module_id,
+            createdAt: new Date(payload.new.created_at)
+          };
+          setNotifications(prev => prev.map(notification => 
+            notification.id === updatedNotification.id ? updatedNotification : notification
+          ));
+          
+          // Update unread count if notification was marked as read
+          if (payload.old.read === false && payload.new.read === true) {
+            setUnreadCount(prev => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `profile_id=eq.${currentUser.id}`
+        },
+        (payload) => {
+          // Remove deleted notification
+          setNotifications(prev => prev.filter(notification => notification.id !== payload.old.id));
+          
+          // Update unread count if deleted notification was unread
+          if (payload.old.read === false) {
+            setUnreadCount(prev => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [currentUser.id]);
 
   // Load all system data

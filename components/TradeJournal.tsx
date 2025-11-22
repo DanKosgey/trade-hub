@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { TradeEntry, TradeOutcome, TradeValidationStatus } from '../types';
+import { TradeEntry, TradeOutcome, TradeValidationStatus, User } from '../types';
+import { journalService } from '../services/journalService';
+import { supabase } from '../supabase/client';
 import { 
   Plus, Search, Filter, ArrowUpRight, ArrowDownRight, MoreHorizontal, 
   Calendar, DollarSign, Smile, Frown, Meh, Save, X, Upload, Image as ImageIcon, 
-  Trash2, Eye, ArrowUpDown, ChevronDown
+  Trash2, Eye, ArrowUpDown, ChevronDown, Loader2
 } from 'lucide-react';
 
 interface TradeJournalProps {
-  entries: TradeEntry[];
-  onAddEntry: (entry: TradeEntry) => void;
-  draftEntry?: Partial<TradeEntry> | null;
-  onClearDraft: () => void;
+  user: User;
 }
 
 const EMOTIONS = ['Confident', 'Anxious', 'FOMO', 'Patient', 'Revenge', 'Disciplined'];
@@ -18,7 +17,10 @@ const EMOTIONS = ['Confident', 'Anxious', 'FOMO', 'Patient', 'Revenge', 'Discipl
 type SortOption = 'date' | 'pnl';
 type SortDirection = 'asc' | 'desc';
 
-const TradeJournal: React.FC<TradeJournalProps> = ({ entries, onAddEntry, draftEntry, onClearDraft }) => {
+const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
+  const [entries, setEntries] = useState<TradeEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,16 +44,106 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ entries, onAddEntry, draftE
     date: new Date().toISOString().split('T')[0]
   });
 
+  // Fetch real journal entries
   useEffect(() => {
-    if (draftEntry) {
-      setFormData((prev) => ({ ...prev, ...draftEntry }));
-      setIsModalOpen(true);
-    }
-  }, [draftEntry]);
+    const fetchEntries = async () => {
+      try {
+        setLoading(true);
+        const entriesData = await journalService.getJournalEntries(user.id);
+        setEntries(entriesData);
+      } catch (err) {
+        console.error('Error fetching journal entries:', err);
+        setError('Failed to load journal entries');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEntries();
+
+    // Set up real-time subscription for journal entries
+    const channel = supabase
+      .channel('journal-entries-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'journal_entries',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          // Add new entry to the list
+          const newEntry: TradeEntry = {
+            id: payload.new.id,
+            pair: payload.new.pair,
+            type: payload.new.type,
+            entryPrice: payload.new.entry_price,
+            stopLoss: payload.new.stop_loss,
+            takeProfit: payload.new.take_profit,
+            exitPrice: payload.new.exit_price,
+            status: payload.new.status,
+            validationResult: payload.new.validation_result,
+            notes: payload.new.notes,
+            date: payload.new.date,
+            emotions: payload.new.emotions,
+            pnl: payload.new.pnl,
+            screenshotUrl: payload.new.screenshot_url
+          };
+          setEntries(prev => [newEntry, ...prev]);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'journal_entries',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          // Update existing entry
+          const updatedEntry: TradeEntry = {
+            id: payload.new.id,
+            pair: payload.new.pair,
+            type: payload.new.type,
+            entryPrice: payload.new.entry_price,
+            stopLoss: payload.new.stop_loss,
+            takeProfit: payload.new.take_profit,
+            exitPrice: payload.new.exit_price,
+            status: payload.new.status,
+            validationResult: payload.new.validation_result,
+            notes: payload.new.notes,
+            date: payload.new.date,
+            emotions: payload.new.emotions,
+            pnl: payload.new.pnl,
+            screenshotUrl: payload.new.screenshot_url
+          };
+          setEntries(prev => prev.map(entry => entry.id === updatedEntry.id ? updatedEntry : entry));
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'journal_entries',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          // Remove deleted entry
+          setEntries(prev => prev.filter(entry => entry.id !== payload.old.id));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user.id]);
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    onClearDraft();
     setFormData({
       pair: 'EURUSD',
       type: 'buy',
@@ -62,27 +154,36 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ entries, onAddEntry, draftE
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newEntry: TradeEntry = {
-      id: Date.now().toString(),
-      pair: formData.pair || 'EURUSD',
-      type: formData.type || 'buy',
-      entryPrice: Number(formData.entryPrice) || 0,
-      stopLoss: Number(formData.stopLoss) || 0,
-      takeProfit: Number(formData.takeProfit) || 0,
-      exitPrice: formData.exitPrice ? Number(formData.exitPrice) : undefined,
-      status: formData.status || 'pending',
-      validationResult: formData.validationResult || 'none',
-      notes: formData.notes || '',
-      date: formData.date || new Date().toISOString(),
-      emotions: formData.emotions || [],
-      pnl: formData.pnl ? Number(formData.pnl) : undefined,
-      screenshotUrl: formData.screenshotUrl
-    };
-    
-    onAddEntry(newEntry);
-    handleCloseModal();
+    try {
+      const newEntryData: Omit<TradeEntry, 'id'> = {
+        pair: formData.pair || 'EURUSD',
+        type: formData.type || 'buy',
+        entryPrice: Number(formData.entryPrice) || 0,
+        stopLoss: Number(formData.stopLoss) || 0,
+        takeProfit: Number(formData.takeProfit) || 0,
+        exitPrice: formData.exitPrice ? Number(formData.exitPrice) : undefined,
+        status: formData.status || 'pending',
+        validationResult: formData.validationResult || 'none',
+        notes: formData.notes || '',
+        date: formData.date || new Date().toISOString(),
+        emotions: formData.emotions || [],
+        pnl: formData.pnl ? Number(formData.pnl) : undefined,
+        screenshotUrl: formData.screenshotUrl
+      };
+
+      const result = await journalService.createJournalEntry(newEntryData, user.id);
+      if (result) {
+        // The real-time subscription will automatically update the entries list
+        handleCloseModal();
+      } else {
+        setError('Failed to create journal entry');
+      }
+    } catch (err) {
+      console.error('Error creating journal entry:', err);
+      setError('Failed to create journal entry');
+    }
   };
 
   const toggleEmotion = (emotion: string) => {
@@ -157,6 +258,33 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ entries, onAddEntry, draftE
     
     return { total, winRate, totalPnL };
   }, [processedEntries]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-8 w-8 animate-spin text-trade-neon" />
+          <p className="mt-2 text-gray-400">Loading journal entries...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-6 text-center">
+        <p className="text-red-200">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="text-white space-y-6">
