@@ -575,6 +575,20 @@ export const courseService = {
     }
   },
 
+  // Get student course progress using RPC function
+  async getStudentCourseProgress(userId: string): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_student_course_progress', { user_id: userId });
+      
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching student course progress:', error);
+      return [];
+    }
+  },
+
   async updateModuleProgress(profileId: string, moduleId: string, updates: Partial<CourseProgress>): Promise<boolean> {
     try {
       const { error } = await supabase

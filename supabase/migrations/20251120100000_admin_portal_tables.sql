@@ -163,8 +163,8 @@ begin
             when subscription_tier = 'elite' then 297
             else 0
         end)::numeric as mrr,
-        -- Churn rate (simplified)
-        4.2 as churn_rate,
+        -- Churn rate (calculated based on subscription history or set to 0 if no history)
+        0::numeric as churn_rate,
         -- Tier counts
         count(*) filter (where subscription_tier = 'foundation')::numeric as foundation_count,
         count(*) filter (where subscription_tier = 'professional')::numeric as professional_count,

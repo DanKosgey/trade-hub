@@ -35,6 +35,22 @@ export interface TradeEntry {
   emotions?: string[]; // e.g., 'confident', 'fomo', 'anxious'
   pnl?: number;        // Realized P&L
   screenshotUrl?: string;
+  
+  // Enhanced fields for better analytics and admin oversight
+  strategy?: string;
+  timeFrame?: string;
+  marketCondition?: string;
+  confidenceLevel?: number; // 1-10
+  riskAmount?: number;
+  positionSize?: number;
+  tradeDuration?: string; // ISO 8601 duration format
+  tags?: string[];
+  adminNotes?: string;
+  adminReviewStatus?: 'pending' | 'reviewed' | 'flagged';
+  reviewTimestamp?: string;
+  mentorId?: string;
+  sessionId?: string;
+  tradeSource?: 'demo' | 'live' | 'paper';
 }
 
 export interface QuizQuestion {

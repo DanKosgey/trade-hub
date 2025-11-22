@@ -2,10 +2,13 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { TradeEntry, TradeOutcome, TradeValidationStatus, User } from '../types';
 import { journalService } from '../services/journalService';
 import { supabase } from '../supabase/client';
+import { validateTradeWithGeminiForUser } from '../services/geminiService';
+import { exportTradeJournal } from '../services/exportService';
 import { 
   Plus, Search, Filter, ArrowUpRight, ArrowDownRight, MoreHorizontal, 
   Calendar, DollarSign, Smile, Frown, Meh, Save, X, Upload, Image as ImageIcon, 
-  Trash2, Eye, ArrowUpDown, ChevronDown, Loader2
+  Trash2, Eye, ArrowUpDown, ChevronDown, Loader2, Download, FileText, ChevronRight,
+  CheckCircle, AlertCircle, XCircle
 } from 'lucide-react';
 
 interface TradeJournalProps {
@@ -13,6 +16,12 @@ interface TradeJournalProps {
 }
 
 const EMOTIONS = ['Confident', 'Anxious', 'FOMO', 'Patient', 'Revenge', 'Disciplined'];
+
+// Add new constants for enhanced fields
+const STRATEGIES = ['Breakout', 'Pullback', 'Trend Following', 'Mean Reversion', 'News Trade', 'Scalping', 'Swing Trade'];
+const TIME_FRAMES = ['1M', '5M', '15M', '30M', '1H', '4H', 'Daily', 'Weekly'];
+const MARKET_CONDITIONS = ['Trending', 'Ranging', 'Volatile', 'Consolidating', 'News Event'];
+const TRADE_SOURCES = ['Demo', 'Live', 'Paper'];
 
 type SortOption = 'date' | 'pnl';
 type SortDirection = 'asc' | 'desc';
@@ -24,7 +33,9 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<TradeEntry | null>(null);
+
   // --- Filtering & Sorting State ---
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'buy' | 'sell'>('all');
@@ -41,7 +52,20 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
     status: 'pending',
     validationResult: 'none',
     emotions: [],
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    // Initialize new fields
+    strategy: '',
+    timeFrame: '',
+    marketCondition: '',
+    confidenceLevel: 5,
+    riskAmount: undefined,
+    positionSize: undefined,
+    tradeDuration: '',
+    tags: [],
+    tradeSource: 'demo',
+    screenshotUrl: '',
+    exitPrice: undefined,
+    pnl: undefined
   });
 
   // Fetch real journal entries
@@ -70,7 +94,7 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
           event: 'INSERT',
           schema: 'public',
           table: 'journal_entries',
-          filter: `user_id=eq.${user.id}`
+          filter: `user_id=eq.${user.id}` // Changed back to user_id for journal entries
         },
         (payload) => {
           // Add new entry to the list
@@ -88,7 +112,22 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
             date: payload.new.date,
             emotions: payload.new.emotions,
             pnl: payload.new.pnl,
-            screenshotUrl: payload.new.screenshot_url
+            screenshotUrl: payload.new.screenshot_url,
+            // Include new fields
+            strategy: payload.new.strategy,
+            timeFrame: payload.new.time_frame,
+            marketCondition: payload.new.market_condition,
+            confidenceLevel: payload.new.confidence_level,
+            riskAmount: payload.new.risk_amount,
+            positionSize: payload.new.position_size,
+            tradeDuration: payload.new.trade_duration,
+            tags: payload.new.tags,
+            adminNotes: payload.new.admin_notes,
+            adminReviewStatus: payload.new.admin_review_status,
+            reviewTimestamp: payload.new.review_timestamp,
+            mentorId: payload.new.mentor_id,
+            sessionId: payload.new.session_id,
+            tradeSource: payload.new.trade_source
           };
           setEntries(prev => [newEntry, ...prev]);
         }
@@ -99,7 +138,7 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
           event: 'UPDATE',
           schema: 'public',
           table: 'journal_entries',
-          filter: `user_id=eq.${user.id}`
+          filter: `user_id=eq.${user.id}` // Changed back to user_id for journal entries
         },
         (payload) => {
           // Update existing entry
@@ -117,7 +156,22 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
             date: payload.new.date,
             emotions: payload.new.emotions,
             pnl: payload.new.pnl,
-            screenshotUrl: payload.new.screenshot_url
+            screenshotUrl: payload.new.screenshot_url,
+            // Include new fields
+            strategy: payload.new.strategy,
+            timeFrame: payload.new.time_frame,
+            marketCondition: payload.new.market_condition,
+            confidenceLevel: payload.new.confidence_level,
+            riskAmount: payload.new.risk_amount,
+            positionSize: payload.new.position_size,
+            tradeDuration: payload.new.trade_duration,
+            tags: payload.new.tags,
+            adminNotes: payload.new.admin_notes,
+            adminReviewStatus: payload.new.admin_review_status,
+            reviewTimestamp: payload.new.review_timestamp,
+            mentorId: payload.new.mentor_id,
+            sessionId: payload.new.session_id,
+            tradeSource: payload.new.trade_source
           };
           setEntries(prev => prev.map(entry => entry.id === updatedEntry.id ? updatedEntry : entry));
         }
@@ -128,7 +182,7 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
           event: 'DELETE',
           schema: 'public',
           table: 'journal_entries',
-          filter: `user_id=eq.${user.id}`
+          filter: `user_id=eq.${user.id}` // Changed back to user_id for journal entries
         },
         (payload) => {
           // Remove deleted entry
@@ -144,20 +198,65 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setEditingEntry(null);
     setFormData({
       pair: 'EURUSD',
       type: 'buy',
       status: 'pending',
       validationResult: 'none',
       emotions: [],
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      // Reset all fields
+      strategy: '',
+      timeFrame: '',
+      marketCondition: '',
+      confidenceLevel: 5,
+      riskAmount: undefined,
+      positionSize: undefined,
+      tradeDuration: '',
+      tags: [],
+      tradeSource: 'demo',
+      screenshotUrl: '',
+      exitPrice: undefined,
+      pnl: undefined
     });
+  };
+
+  // Add this new function to handle editing an entry
+  const handleEditEntry = (entry: TradeEntry) => {
+    setEditingEntry(entry);
+    setFormData({
+      pair: entry.pair,
+      type: entry.type,
+      entryPrice: entry.entryPrice,
+      stopLoss: entry.stopLoss,
+      takeProfit: entry.takeProfit,
+      exitPrice: entry.exitPrice,
+      status: entry.status,
+      validationResult: entry.validationResult,
+      notes: entry.notes,
+      date: entry.date,
+      emotions: entry.emotions || [],
+      pnl: entry.pnl,
+      screenshotUrl: entry.screenshotUrl,
+      // Include new fields
+      strategy: entry.strategy,
+      timeFrame: entry.timeFrame,
+      marketCondition: entry.marketCondition,
+      confidenceLevel: entry.confidenceLevel,
+      riskAmount: entry.riskAmount,
+      positionSize: entry.positionSize,
+      tradeDuration: entry.tradeDuration,
+      tags: entry.tags,
+      tradeSource: entry.tradeSource
+    });
+    setIsModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const newEntryData: Omit<TradeEntry, 'id'> = {
+      const entryData: Omit<TradeEntry, 'id'> = {
         pair: formData.pair || 'EURUSD',
         type: formData.type || 'buy',
         entryPrice: Number(formData.entryPrice) || 0,
@@ -170,19 +269,73 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
         date: formData.date || new Date().toISOString(),
         emotions: formData.emotions || [],
         pnl: formData.pnl ? Number(formData.pnl) : undefined,
-        screenshotUrl: formData.screenshotUrl
+        screenshotUrl: formData.screenshotUrl || undefined,
+        // Include new fields
+        strategy: formData.strategy || undefined,
+        timeFrame: formData.timeFrame || undefined,
+        marketCondition: formData.marketCondition || undefined,
+        confidenceLevel: formData.confidenceLevel,
+        riskAmount: formData.riskAmount ? Number(formData.riskAmount) : undefined,
+        positionSize: formData.positionSize ? Number(formData.positionSize) : undefined,
+        tradeDuration: formData.tradeDuration || undefined,
+        tags: formData.tags || undefined,
+        tradeSource: formData.tradeSource || 'demo'
       };
 
-      const result = await journalService.createJournalEntry(newEntryData, user.id);
-      if (result) {
-        // The real-time subscription will automatically update the entries list
-        handleCloseModal();
+      if (editingEntry) {
+        // Update existing entry
+        const success = await journalService.updateJournalEntry(editingEntry.id, entryData);
+        if (success) {
+          // The real-time subscription will automatically update the entries list
+          handleCloseModal();
+        } else {
+          setError('Failed to update journal entry');
+        }
       } else {
-        setError('Failed to create journal entry');
+        // Create new entry
+        // If this is a new trade entry and user wants AI validation, run it
+        if (formData.validationResult === 'none' || !formData.validationResult) {
+          // Prepare trade details for AI validation
+          const tradeDetails = `
+            Pair: ${entryData.pair}
+            Type: ${entryData.type}
+            Entry Price: ${entryData.entryPrice}
+            Stop Loss: ${entryData.stopLoss}
+            Take Profit: ${entryData.takeProfit}
+            Strategy: ${entryData.strategy || 'Not specified'}
+            Time Frame: ${entryData.timeFrame || 'Not specified'}
+            Market Condition: ${entryData.marketCondition || 'Not specified'}
+            Confidence Level: ${entryData.confidenceLevel || 'Not specified'}
+            Notes: ${entryData.notes || 'None'}
+          `;
+
+          try {
+            const validation = await validateTradeWithGeminiForUser(
+              user.id,
+              tradeDetails,
+              entryData.screenshotUrl
+            );
+
+            // Update the entryData with AI validation result
+            entryData.validationResult = validation.verdict.toLowerCase() as TradeValidationStatus;
+          } catch (validationError) {
+            console.error('AI validation error:', validationError);
+            // If AI validation fails, we'll still save the trade but mark validation as failed
+            entryData.validationResult = 'warning';
+          }
+        }
+
+        const result = await journalService.createJournalEntry(entryData, user.id);
+        if (result) {
+          // The real-time subscription will automatically update the entries list
+          handleCloseModal();
+        } else {
+          setError('Failed to create journal entry');
+        }
       }
     } catch (err) {
-      console.error('Error creating journal entry:', err);
-      setError('Failed to create journal entry');
+      console.error('Error saving journal entry:', err);
+      setError('Failed to save journal entry');
     }
   };
 
@@ -192,6 +345,16 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
       return current.includes(emotion)
         ? { ...prev, emotions: current.filter(e => e !== emotion) }
         : { ...prev, emotions: [...current, emotion] };
+    });
+  };
+
+  // Add function to toggle tags
+  const toggleTag = (tag: string) => {
+    setFormData(prev => {
+      const current = prev.tags || [];
+      return current.includes(tag)
+        ? { ...prev, tags: current.filter(t => t !== tag) }
+        : { ...prev, tags: [...current, tag] };
     });
   };
 
@@ -223,7 +386,8 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
     // 1. Filter
     const filtered = entries.filter(entry => {
       const matchesSearch = (entry.pair && entry.pair.toLowerCase().includes(searchTerm.toLowerCase())) || 
-                            (entry.notes && entry.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+                            (entry.notes && entry.notes.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                            (entry.strategy && entry.strategy.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesType = filterType === 'all' || (entry.type && entry.type === filterType);
       const matchesOutcome = filterOutcome === 'all' || (entry.status && entry.status === filterOutcome);
       return matchesSearch && matchesType && matchesOutcome;
@@ -286,6 +450,17 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
     );
   }
 
+  // Function to handle export
+  const handleExport = async (format: 'csv' | 'pdf') => {
+    try {
+      await exportTradeJournal(entries, format, `trade-journal-${user.name || 'user'}-${new Date().toISOString().split('T')[0]}`);
+      setShowExportModal(false);
+    } catch (error) {
+      console.error(`Error exporting to ${format.toUpperCase()}:`, error);
+      // In a real app, you would show an error message to the user
+    }
+  };
+
   return (
     <div className="text-white space-y-6">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
@@ -293,12 +468,20 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
           <h1 className="text-3xl font-bold">Trade Journal</h1>
           <p className="text-gray-400">Track your performance and psychology.</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-trade-accent hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-lg shadow-trade-accent/20"
-        >
-          <Plus className="h-5 w-5" /> New Entry
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setShowExportModal(true)}
+            className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
+          >
+            <Download className="h-5 w-5" /> Export
+          </button>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-trade-accent hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-lg shadow-trade-accent/20"
+          >
+            <Plus className="h-5 w-5" /> New Entry
+          </button>
+        </div>
       </div>
 
       {/* Dynamic Stats Overview (updates based on filters) */}
@@ -443,9 +626,9 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                   )}
                 </td>
                 <td className="p-4">
-                  {entry.validationResult === 'approved' && <span className="text-green-400 text-xs border border-green-500/30 bg-green-500/10 px-2 py-1 rounded flex items-center gap-1 w-fit"><CheckCircleIcon /> Approved</span>}
-                  {entry.validationResult === 'warning' && <span className="text-yellow-400 text-xs border border-yellow-500/30 bg-yellow-500/10 px-2 py-1 rounded flex items-center gap-1 w-fit"><AlertIcon /> Warning</span>}
-                  {entry.validationResult === 'rejected' && <span className="text-red-400 text-xs border border-red-500/30 bg-red-500/10 px-2 py-1 rounded flex items-center gap-1 w-fit"><XCircleIcon /> Rejected</span>}
+                  {entry.validationResult === 'approved' && <span className="text-green-400 text-xs border border-green-500/30 bg-green-500/10 px-2 py-1 rounded flex items-center gap-1 w-fit"><CheckCircle className="h-3 w-3" /> Approved</span>}
+                  {entry.validationResult === 'warning' && <span className="text-yellow-400 text-xs border border-yellow-500/30 bg-yellow-500/10 px-2 py-1 rounded flex items-center gap-1 w-fit"><AlertCircle className="h-3 w-3" /> Warning</span>}
+                  {entry.validationResult === 'rejected' && <span className="text-red-400 text-xs border border-red-500/30 bg-red-500/10 px-2 py-1 rounded flex items-center gap-1 w-fit"><XCircle className="h-3 w-3" /> Rejected</span>}
                   {entry.validationResult === 'none' && <span className="text-gray-600 text-xs">-</span>}
                 </td>
                 <td className={`p-4 text-right font-mono font-bold ${
@@ -464,8 +647,15 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                   </div>
                 </td>
                 <td className="p-4 text-right">
-                  <button className="text-gray-600 hover:text-white transition opacity-0 group-hover:opacity-100">
-                    <MoreHorizontal className="h-4 w-4" />
+                  <button 
+                    onClick={() => handleEditEntry(entry)}
+                    className="text-gray-400 hover:text-white transition p-1.5 rounded-lg hover:bg-gray-700"
+                    title="Edit Entry"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                      <path d="m15 5 4 4"/>
+                    </svg>
                   </button>
                 </td>
               </tr>
@@ -510,7 +700,9 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
           <div className="bg-trade-dark border border-gray-700 rounded-2xl w-full max-w-2xl shadow-2xl my-8 animate-in fade-in zoom-in duration-200">
             <form onSubmit={handleSubmit}>
               <div className="flex justify-between items-center p-6 border-b border-gray-700 bg-gray-800/50 rounded-t-2xl">
-                <h2 className="text-xl font-bold text-white">Log New Trade</h2>
+                <h2 className="text-xl font-bold text-white">
+                  {editingEntry ? 'Edit Trade Entry' : 'Log New Trade'}
+                </h2>
                 <button type="button" onClick={handleCloseModal} className="text-gray-400 hover:text-white">
                   <X className="h-6 w-6" />
                 </button>
@@ -567,8 +759,8 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                     <input 
                       type="number" step="0.00001"
                       className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none focus:border-blue-500"
-                      value={formData.entryPrice}
-                      onChange={e => setFormData({...formData, entryPrice: Number(e.target.value)})}
+                      value={formData.entryPrice || ''}
+                      onChange={e => setFormData({...formData, entryPrice: e.target.value ? Number(e.target.value) : undefined})}
                     />
                   </div>
                   <div>
@@ -576,8 +768,8 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                     <input 
                       type="number" step="0.00001"
                       className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none text-red-400 focus:border-red-500"
-                      value={formData.stopLoss}
-                      onChange={e => setFormData({...formData, stopLoss: Number(e.target.value)})}
+                      value={formData.stopLoss || ''}
+                      onChange={e => setFormData({...formData, stopLoss: e.target.value ? Number(e.target.value) : undefined})}
                     />
                   </div>
                   <div>
@@ -585,8 +777,8 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                     <input 
                       type="number" step="0.00001"
                       className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none text-green-400 focus:border-green-500"
-                      value={formData.takeProfit}
-                      onChange={e => setFormData({...formData, takeProfit: Number(e.target.value)})}
+                      value={formData.takeProfit || ''}
+                      onChange={e => setFormData({...formData, takeProfit: e.target.value ? Number(e.target.value) : undefined})}
                     />
                   </div>
                   <div>
@@ -595,7 +787,7 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                       type="number" step="0.00001"
                       className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none"
                       value={formData.exitPrice || ''}
-                      onChange={e => setFormData({...formData, exitPrice: Number(e.target.value)})}
+                      onChange={e => setFormData({...formData, exitPrice: e.target.value ? Number(e.target.value) : undefined})}
                     />
                   </div>
                 </div>
@@ -606,7 +798,7 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                     <label className="block text-xs text-gray-400 mb-1">Outcome</label>
                     <select 
                       className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none"
-                      value={formData.status}
+                      value={formData.status || 'pending'}
                       onChange={e => setFormData({...formData, status: e.target.value as TradeOutcome})}
                     >
                       <option value="pending">Pending / Open</option>
@@ -624,7 +816,7 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                         (formData.pnl || 0) > 0 ? 'text-green-400' : (formData.pnl || 0) < 0 ? 'text-red-400' : 'text-white'
                       }`}
                       value={formData.pnl || ''}
-                      onChange={e => setFormData({...formData, pnl: Number(e.target.value)})}
+                      onChange={e => setFormData({...formData, pnl: e.target.value ? Number(e.target.value) : undefined})}
                     />
                    </div>
                 </div>
@@ -715,6 +907,135 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                   </div>
                 </div>
 
+                {/* Strategy and Time Frame */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Strategy</label>
+                    <select 
+                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-trade-accent outline-none"
+                      value={formData.strategy || ''}
+                      onChange={e => setFormData({...formData, strategy: e.target.value})}
+                    >
+                      <option value="">Select Strategy</option>
+                      {STRATEGIES.map(strategy => (
+                        <option key={strategy} value={strategy}>{strategy}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Time Frame</label>
+                    <select 
+                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-trade-accent outline-none"
+                      value={formData.timeFrame || ''}
+                      onChange={e => setFormData({...formData, timeFrame: e.target.value})}
+                    >
+                      <option value="">Select Time Frame</option>
+                      {TIME_FRAMES.map(tf => (
+                        <option key={tf} value={tf}>{tf}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Market Condition and Confidence */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Market Condition</label>
+                    <select 
+                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-trade-accent outline-none"
+                      value={formData.marketCondition || ''}
+                      onChange={e => setFormData({...formData, marketCondition: e.target.value})}
+                    >
+                      <option value="">Select Condition</option>
+                      {MARKET_CONDITIONS.map(condition => (
+                        <option key={condition} value={condition}>{condition}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Confidence Level: {formData.confidenceLevel || 5}/10</label>
+                    <input 
+                      type="range" 
+                      min="1" 
+                      max="10" 
+                      value={formData.confidenceLevel || 5}
+                      onChange={e => setFormData({...formData, confidenceLevel: Number(e.target.value)})}
+                      className="w-full accent-trade-accent"
+                    />
+                  </div>
+                </div>
+
+                {/* Risk and Position */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Risk Amount ($)</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none focus:border-blue-500"
+                      value={formData.riskAmount || ''}
+                      onChange={e => setFormData({...formData, riskAmount: e.target.value ? Number(e.target.value) : undefined})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Position Size</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none focus:border-blue-500"
+                      value={formData.positionSize || ''}
+                      onChange={e => setFormData({...formData, positionSize: e.target.value ? Number(e.target.value) : undefined})}
+                    />
+                  </div>
+                </div>
+
+                {/* Trade Duration and Source */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Trade Duration</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g., PT30M for 30 minutes"
+                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white outline-none focus:border-trade-accent"
+                      value={formData.tradeDuration || ''}
+                      onChange={e => setFormData({...formData, tradeDuration: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Trade Source</label>
+                    <select 
+                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-trade-accent outline-none"
+                      value={formData.tradeSource || 'demo'}
+                      onChange={e => setFormData({...formData, tradeSource: e.target.value as 'demo' | 'live' | 'paper'})}
+                    >
+                      {TRADE_SOURCES.map(source => (
+                        <option key={source} value={source.toLowerCase()}>{source}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Tags */}
+                <div>
+                  <label className="block text-xs text-gray-400 mb-2">Tags</label>
+                  <div className="flex flex-wrap gap-2">
+                    {['Scalping', 'Swing', 'News Trade', 'Technical', 'Fundamental', 'EURUSD', 'GBPUSD', 'Breakout', 'Pullback'].map(tag => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition border ${
+                          formData.tags?.includes(tag) 
+                            ? 'bg-blue-500 text-white border-blue-500' 
+                            : 'bg-gray-800 text-gray-400 border-gray-600 hover:border-gray-400'
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* AI Validation (Read Only) */}
                 {formData.validationResult && formData.validationResult !== 'none' && (
                    <div className="bg-gray-900 p-3 rounded border border-gray-700 flex items-center justify-between">
@@ -742,20 +1063,88 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                   type="submit"
                   className="px-6 py-2 bg-trade-accent hover:bg-blue-600 text-white rounded-lg font-medium flex items-center gap-2 transition shadow-lg shadow-blue-900/20"
                 >
-                  <Save className="h-4 w-4" /> Save Entry
+                  <Save className="h-4 w-4" /> 
+                  {editingEntry ? 'Update Entry' : 'Save Entry'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-trade-dark border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl my-8 animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center p-6 border-b border-gray-700 bg-gray-800/50 rounded-t-2xl">
+              <h2 className="text-xl font-bold text-white">Export Trade Journal</h2>
+              <button 
+                onClick={() => setShowExportModal(false)} 
+                className="text-gray-400 hover:text-white"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              <p className="text-gray-300">Choose a format to export your trade journal:</p>
+              
+              <div className="space-y-4">
+                <button
+                  onClick={() => handleExport('csv')}
+                  className="w-full bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-lg p-4 flex items-center justify-between transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-500/20 p-2 rounded-lg">
+                      <FileText className="h-6 w-6 text-blue-400" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-bold text-white">CSV Format</h3>
+                      <p className="text-sm text-gray-400">Compatible with Excel and other spreadsheet applications</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-gray-400" />
+                </button>
+                
+                <button
+                  onClick={() => handleExport('pdf')}
+                  className="w-full bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-lg p-4 flex items-center justify-between transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="bg-red-500/20 p-2 rounded-lg">
+                      <FileText className="h-6 w-6 text-red-400" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-bold text-white">PDF Report</h3>
+                      <p className="text-sm text-gray-400">Professional report format for sharing</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-gray-400" />
+                </button>
+              </div>
+              
+              <div className="text-xs text-gray-500 mt-4">
+                <p>Exporting {entries.length} trade entries</p>
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-gray-700 flex justify-end gap-3 bg-gray-800/50 rounded-b-2xl">
+              <button 
+                onClick={() => setShowExportModal(false)}
+                className="px-4 py-2 text-gray-400 hover:text-white transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
 
+// Add missing icon components
 // Tiny Helper Components for Icons
-const CheckCircleIcon = () => <div className="h-3 w-3 rounded-full border border-current flex items-center justify-center"><div className="h-1.5 w-2 border-b border-r border-current rotate-45 -mt-0.5"></div></div>;
-const AlertIcon = () => <div className="h-3 w-3 rounded-full border border-current flex items-center justify-center text-[8px] font-bold">!</div>;
-const XCircleIcon = () => <div className="h-3 w-3 rounded-full border border-current flex items-center justify-center text-[8px]">x</div>;
 
 export default TradeJournal;

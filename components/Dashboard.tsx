@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { User, CourseModule, TradeEntry } from '../types';
 import { PlayCircle, Award, TrendingUp, Clock, CalendarPlus, CheckCircle, AlertTriangle, Activity, DollarSign, TrendingDown, Percent } from 'lucide-react';
@@ -7,6 +6,7 @@ import {
   AreaChart, Area, CartesianGrid 
 } from 'recharts';
 import { fetchStudentWithTrades } from '../services/adminService';
+import { courseService } from '../services/courseService';
 import { supabase } from '../supabase/client';
 
 interface DashboardProps {
@@ -16,14 +16,11 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user, courses, onContinueCourse }) => {
-  const completedCount = courses.filter(c => c.completed).length;
-  const totalCount = courses.length;
-  const percent = Math.round((completedCount / totalCount) * 100);
-
   // State for real trade data
   const [trades, setTrades] = useState<TradeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [courseProgress, setCourseProgress] = useState<number>(0);
 
   // --- Market Status Timer Logic ---
   const [marketStatus, setMarketStatus] = useState<{isOpen: boolean; label: string; subtext: string}>({
@@ -34,22 +31,45 @@ const Dashboard: React.FC<DashboardProps> = ({ user, courses, onContinueCourse }
 
   // Fetch real trade data for the student
   useEffect(() => {
-    const fetchTrades = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
+        
+        // Fetch trades
         const studentData = await fetchStudentWithTrades(user.id);
         if (studentData) {
           setTrades(studentData.recentTrades);
         }
+        
+        // Fetch course progress
+        const progressData = await courseService.getStudentCourseProgress(user.id);
+        if (progressData && progressData.length > 0) {
+          // Calculate overall progress as average of all courses
+          const totalProgress = progressData.reduce((sum, course) => sum + (course.completion_percentage || 0), 0);
+          const avgProgress = Math.round(totalProgress / progressData.length);
+          setCourseProgress(avgProgress);
+        } else {
+          // Fallback to mock data calculation if no progress data
+          const completedCount = courses.filter(c => c.completed).length;
+          const totalCount = courses.length;
+          const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+          setCourseProgress(percent);
+        }
       } catch (err) {
-        console.error('Error fetching trades:', err);
-        setError('Failed to load trade data');
+        console.error('Error fetching data:', err);
+        setError('Failed to load data');
+        
+        // Fallback to mock data calculation on error
+        const completedCount = courses.filter(c => c.completed).length;
+        const totalCount = courses.length;
+        const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+        setCourseProgress(percent);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchTrades();
+    fetchData();
 
     // Set up real-time subscription for trade changes
     const channel = supabase
@@ -60,7 +80,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, courses, onContinueCourse }
           event: 'INSERT',
           schema: 'public',
           table: 'journal_entries',
-          filter: `user_id=eq.${user.id}`
+          filter: `user_id=eq.${user.id}` // Changed back to user_id for journal entries
         },
         (payload) => {
           // Add new trade to the list
@@ -86,7 +106,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, courses, onContinueCourse }
           event: 'UPDATE',
           schema: 'public',
           table: 'journal_entries',
-          filter: `user_id=eq.${user.id}`
+          filter: `user_id=eq.${user.id}` // Changed back to user_id for journal entries
         },
         (payload) => {
           // Update existing trade
@@ -112,7 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, courses, onContinueCourse }
           event: 'DELETE',
           schema: 'public',
           table: 'journal_entries',
-          filter: `user_id=eq.${user.id}`
+          filter: `user_id=eq.${user.id}` // Changed back to user_id for journal entries
         },
         (payload) => {
           // Remove deleted trade
@@ -296,9 +316,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, courses, onContinueCourse }
                 <div className="p-2 bg-blue-500/20 rounded text-blue-400"><Award className="h-5 w-5" /></div>
                 <span className="text-gray-400 text-sm">Course Progress</span>
               </div>
-              <div className="text-3xl font-bold mb-2">{percent}%</div>
+              <div className="text-3xl font-bold mb-2">{courseProgress}%</div>
               <div className="w-full bg-gray-700 h-2 rounded-full mt-3">
-                <div className="bg-blue-500 h-2 rounded-full transition-all duration-500" style={{ width: `${percent}%` }}></div>
+                <div className="bg-blue-500 h-2 rounded-full transition-all duration-500" style={{ width: `${courseProgress}%` }}></div>
               </div>
             </div>
 

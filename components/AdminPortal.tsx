@@ -541,10 +541,33 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
       {activeTab === 'analytics' && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700"><div className="flex items-center gap-2 text-gray-400 mb-2"><Activity className="h-4 w-4 text-trade-neon" /> MRR</div><div className="text-3xl font-bold text-white">${businessMetrics.mrr.toLocaleString()}</div><div className="text-xs text-green-400 mt-1 flex items-center gap-1"><TrendingUp className="h-3 w-3" /> +12%</div></div>
-            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700"><div className="flex items-center gap-2 text-gray-400 mb-2"><Users className="h-4 w-4" /> Subscribers</div><div className="text-3xl font-bold text-white">{students.length}</div></div>
-            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700"><div className="flex items-center gap-2 text-gray-400 mb-2"><CreditCard className="h-4 w-4" /> Lifetime Revenue</div><div className="text-3xl font-bold text-white">${businessMetrics.totalRevenue.toLocaleString()}</div></div>
-            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700"><div className="flex items-center gap-2 text-gray-400 mb-2"><ArrowDownRight className="h-4 w-4 text-red-500" /> Churn</div><div className="text-3xl font-bold text-red-400">{businessMetrics.churnRate}%</div></div>
+            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
+              <div className="flex items-center gap-2 text-gray-400 mb-2">
+                <Activity className="h-4 w-4 text-trade-neon" /> MRR
+              </div>
+              <div className="text-3xl font-bold text-white">${businessMetrics.mrr.toLocaleString()}</div>
+              <div className="text-xs text-green-400 mt-1 flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" /> +{Math.max(0, Math.min(100, Math.round((businessMetrics.mrr / Math.max(1, businessMetrics.totalRevenue - businessMetrics.mrr)) * 100)))}%
+              </div>
+            </div>
+            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
+              <div className="flex items-center gap-2 text-gray-400 mb-2">
+                <Users className="h-4 w-4" /> Subscribers
+              </div>
+              <div className="text-3xl font-bold text-white">{students.length}</div>
+            </div>
+            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
+              <div className="flex items-center gap-2 text-gray-400 mb-2">
+                <CreditCard className="h-4 w-4" /> Lifetime Revenue
+              </div>
+              <div className="text-3xl font-bold text-white">${businessMetrics.totalRevenue.toLocaleString()}</div>
+            </div>
+            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
+              <div className="flex items-center gap-2 text-gray-400 mb-2">
+                <ArrowDownRight className="h-4 w-4 text-red-500" /> Churn
+              </div>
+              <div className="text-3xl font-bold text-red-400">{businessMetrics.churnRate.toFixed(1)}%</div>
+            </div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 bg-trade-dark p-6 rounded-xl border border-gray-700">

@@ -2,66 +2,103 @@ import { supabase } from '../supabase/client';
 
 export interface Notification {
   id: string;
-  profileId: string;
+  userId: string;
   title: string;
   message: string;
-  type: 'info' | 'warning' | 'success' | 'error';
+  type: 'info' | 'success' | 'warning' | 'error';
   read: boolean;
-  courseId?: string;
-  moduleId?: string;
-  createdAt: Date;
+  createdAt: string;
+  relatedEntityId?: string;
+  relatedEntityType?: 'trade' | 'course' | 'quiz' | 'module';
 }
-
-export interface NotificationPreferences {
-  profileId: string;
-  emailNotifications: boolean;
-  pushNotifications: boolean;
-  courseUpdates: boolean;
-  moduleUpdates: boolean;
-  quizReminders: boolean;
-  progressReminders: boolean;
-  updatedAt: Date;
-}
-
-// Default notification preferences for new users
-const DEFAULT_NOTIFICATION_PREFERENCES: Omit<NotificationPreferences, 'profileId' | 'updatedAt'> = {
-  emailNotifications: true,
-  pushNotifications: true,
-  courseUpdates: true,
-  moduleUpdates: true,
-  quizReminders: true,
-  progressReminders: true
-};
 
 export const notificationService = {
-  // Get notifications for a user
-  async getNotifications(profileId: string): Promise<Notification[]> {
-    // Validate that profileId is a valid UUID
-    const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId);
-    if (!isValidUuid) {
-      console.warn('Invalid profile ID provided to getNotifications:', profileId);
-      return [];
+  // Create a new notification
+  async createNotification(notification: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification | null> {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert({
+          profile_id: notification.userId, // Changed from user_id to profile_id
+          title: notification.title,
+          message: notification.message,
+          type: notification.type,
+          read: notification.read,
+          related_entity_id: notification.relatedEntityId,
+          related_entity_type: notification.relatedEntityType
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        id: data.id,
+        userId: data.profile_id, // Changed from user_id to profile_id
+        title: data.title,
+        message: data.message,
+        type: data.type,
+        read: data.read,
+        createdAt: data.created_at,
+        relatedEntityId: data.related_entity_id,
+        relatedEntityType: data.related_entity_type
+      };
+    } catch (error) {
+      console.error('Error creating notification:', error);
+      return null;
     }
-    
+  },
+
+  // Get unread notifications for a user
+  async getUnreadNotifications(userId: string): Promise<Notification[]> {
     try {
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
-        .eq('profile_id', profileId)
+        .eq('profile_id', userId) // Changed from user_id to profile_id
+        .eq('read', false)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       return data.map(notification => ({
         id: notification.id,
-        profileId: notification.profile_id,
+        userId: notification.profile_id, // Changed from user_id to profile_id
         title: notification.title,
         message: notification.message,
         type: notification.type,
         read: notification.read,
-        courseId: notification.course_id,
-        moduleId: notification.module_id,
-        createdAt: new Date(notification.created_at)
+        createdAt: notification.created_at,
+        relatedEntityId: notification.related_entity_id,
+        relatedEntityType: notification.related_entity_type
+      }));
+    } catch (error) {
+      console.error('Error fetching unread notifications:', error);
+      return [];
+    }
+  },
+
+  // Get all notifications for a user
+  async getAllNotifications(userId: string): Promise<Notification[]> {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('profile_id', userId) // Changed from user_id to profile_id
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return data.map(notification => ({
+        id: notification.id,
+        userId: notification.profile_id, // Changed from user_id to profile_id
+        title: notification.title,
+        message: notification.message,
+        type: notification.type,
+        read: notification.read,
+        createdAt: notification.created_at,
+        relatedEntityId: notification.related_entity_id,
+        relatedEntityType: notification.related_entity_type
       }));
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -69,7 +106,7 @@ export const notificationService = {
     }
   },
 
-  // Mark notification as read
+  // Mark a notification as read
   async markAsRead(notificationId: string): Promise<boolean> {
     try {
       const { error } = await supabase
@@ -85,20 +122,13 @@ export const notificationService = {
     }
   },
 
-  // Mark all notifications as read
-  async markAllAsRead(profileId: string): Promise<boolean> {
-    // Validate that profileId is a valid UUID
-    const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId);
-    if (!isValidUuid) {
-      console.warn('Invalid profile ID provided to markAllAsRead:', profileId);
-      return false;
-    }
-    
+  // Mark all notifications as read for a user
+  async markAllAsRead(userId: string): Promise<boolean> {
     try {
       const { error } = await supabase
         .from('notifications')
         .update({ read: true })
-        .eq('profile_id', profileId)
+        .eq('profile_id', userId) // Changed from user_id to profile_id
         .eq('read', false);
 
       if (error) throw error;
@@ -109,7 +139,7 @@ export const notificationService = {
     }
   },
 
-  // Delete notification
+  // Delete a notification
   async deleteNotification(notificationId: string): Promise<boolean> {
     try {
       const { error } = await supabase
@@ -125,184 +155,59 @@ export const notificationService = {
     }
   },
 
-  // Get unread notifications count
-  async getUnreadCount(profileId: string): Promise<number> {
-    // Validate that profileId is a valid UUID
-    const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId);
-    if (!isValidUuid) {
-      console.warn('Invalid profile ID provided to getUnreadCount:', profileId);
-      return 0;
-    }
-    
-    try {
-      const { count, error } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact' })
-        .eq('profile_id', profileId)
-        .eq('read', false);
-
-      if (error) throw error;
-      return count || 0;
-    } catch (error) {
-      console.error('Error fetching unread notifications count:', error);
-      return 0;
-    }
+  // Create a trade review notification for admin
+  async createTradeReviewNotification(tradeId: string, studentName: string, adminId: string): Promise<Notification | null> {
+    return this.createNotification({
+      userId: adminId,
+      title: 'New Trade for Review',
+      message: `${studentName} has submitted a new trade for your review.`,
+      type: 'info',
+      read: false,
+      relatedEntityId: tradeId,
+      relatedEntityType: 'trade'
+    });
   },
 
-  // Get notification preferences
-  async getPreferences(profileId: string): Promise<NotificationPreferences | null> {
-    // Validate that profileId is a valid UUID
-    const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId);
-    if (!isValidUuid) {
-      console.warn('Invalid profile ID provided to getPreferences:', profileId);
-      return null;
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('notification_preferences')
-        .select('*')
-        .eq('profile_id', profileId)
-        .maybeSingle(); // Use maybeSingle instead of single to handle cases where no preferences exist
-
-      if (error) {
-        console.error('Error fetching notification preferences:', error);
-        // If it's a "no rows" error, we'll create default preferences
-        if (error.code === 'PGRST116') {
-          // Create default preferences for the user
-          const defaultPreferences = await this.createDefaultPreferences(profileId);
-          return defaultPreferences;
-        }
-        return null;
-      }
-      
-      // If no preferences exist, create default ones
-      if (!data) {
-        const defaultPreferences = await this.createDefaultPreferences(profileId);
-        return defaultPreferences;
-      }
-
-      return {
-        profileId: data.profile_id,
-        emailNotifications: data.email_notifications,
-        pushNotifications: data.push_notifications,
-        courseUpdates: data.course_updates,
-        moduleUpdates: data.module_updates,
-        quizReminders: data.quiz_reminders,
-        progressReminders: data.progress_reminders,
-        updatedAt: new Date(data.updated_at)
-      };
-    } catch (error) {
-      console.error('Error fetching notification preferences:', error);
-      return null;
-    }
+  // Create a trade feedback notification for student
+  async createTradeFeedbackNotification(tradeId: string, studentId: string, adminName: string, feedback: string): Promise<Notification | null> {
+    return this.createNotification({
+      userId: studentId,
+      title: 'Trade Review Feedback',
+      message: `${adminName} has reviewed your trade and provided feedback: ${feedback}`,
+      type: 'info',
+      read: false,
+      relatedEntityId: tradeId,
+      relatedEntityType: 'trade'
+    });
   },
 
-  // Create default notification preferences for a user
-  async createDefaultPreferences(profileId: string): Promise<NotificationPreferences | null> {
-    try {
-      const { data, error } = await supabase
-        .from('notification_preferences')
-        .insert({
-          profile_id: profileId,
-          ...DEFAULT_NOTIFICATION_PREFERENCES
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      return {
-        profileId: data.profile_id,
-        emailNotifications: data.email_notifications,
-        pushNotifications: data.push_notifications,
-        courseUpdates: data.course_updates,
-        moduleUpdates: data.module_updates,
-        quizReminders: data.quiz_reminders,
-        progressReminders: data.progress_reminders,
-        updatedAt: new Date(data.updated_at)
-      };
-    } catch (error) {
-      console.error('Error creating default notification preferences:', error);
-      return null;
-    }
+  // Create a mentor assignment notification
+  async createMentorAssignmentNotification(studentId: string, mentorName: string): Promise<Notification | null> {
+    return this.createNotification({
+      userId: studentId,
+      title: 'Mentor Assigned',
+      message: `You have been assigned to ${mentorName} as your mentor.`,
+      type: 'success',
+      read: false
+    });
   },
 
-  // Update notification preferences
-  async updatePreferences(
-    profileId: string, 
-    preferences: Partial<NotificationPreferences>
-  ): Promise<boolean> {
-    // Validate that profileId is a valid UUID
-    const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profileId);
-    if (!isValidUuid) {
-      console.warn('Invalid profile ID provided to updatePreferences:', profileId);
-      return false;
-    }
-    
-    try {
-      const { error } = await supabase
-        .from('notification_preferences')
-        .upsert({
-          profile_id: profileId,
-          email_notifications: preferences.emailNotifications,
-          push_notifications: preferences.pushNotifications,
-          course_updates: preferences.courseUpdates,
-          module_updates: preferences.moduleUpdates,
-          quiz_reminders: preferences.quizReminders,
-          progress_reminders: preferences.progressReminders,
-          updated_at: new Date()
-        }, {
-          onConflict: 'profile_id'
-        });
+  // Subscribe to real-time notifications
+  subscribeToNotifications(userId: string, callback: (payload: any) => void) {
+    const channel = supabase
+      .channel('notifications-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `profile_id=eq.${userId}` // Changed from user_id to profile_id
+        },
+        callback
+      )
+      .subscribe();
 
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      console.error('Error updating notification preferences:', error);
-      return false;
-    }
-  },
-
-  // Create course update notification
-  async createCourseUpdateNotification(
-    courseId: string,
-    updaterName: string,
-    updateType: 'new_version' | 'content_update' | 'new_module'
-  ): Promise<boolean> {
-    try {
-      // This would call the PostgreSQL function we created
-      const { error } = await supabase.rpc('create_course_update_notification', {
-        course_id: courseId,
-        updater_name: updaterName,
-        update_type: updateType
-      });
-
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      console.error('Error creating course update notification:', error);
-      return false;
-    }
-  },
-
-  // Create module update notification
-  async createModuleUpdateNotification(
-    moduleId: string,
-    updaterName: string
-  ): Promise<boolean> {
-    try {
-      // This would call the PostgreSQL function we created
-      const { error } = await supabase.rpc('create_module_update_notification', {
-        module_id: moduleId,
-        updater_name: updaterName
-      });
-
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      console.error('Error creating module update notification:', error);
-      return false;
-    }
+    return channel;
   }
 };

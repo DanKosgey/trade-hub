@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import LandingPage from './components/LandingPage';
 import LoginPage from './components/LoginPage';
@@ -13,6 +13,7 @@ import QuizPlayer from './components/QuizPlayer';
 import CommunityHub from './components/CommunityHub';
 import CourseManagementSystem from './components/enhanced/CourseManagementSystem';
 import { User, UserRole, CourseModule, TradeRule, TradeEntry, MentorshipApplication, StudentProfile } from './types';
+import { courseService } from './services/courseService';
 import { Lock, Settings, GraduationCap, BarChart, Bot, PlayCircle, CheckSquare, FileText, ArrowRight, ShieldAlert } from 'lucide-react';
 import { supabase } from './supabase/client';
 
@@ -69,24 +70,6 @@ const MOCK_RULES: TradeRule[] = [
   { id: '6', text: 'Is there an unmitigated Fair Value Gap above current price?', type: 'sell', required: true },
 ];
 
-const MOCK_COURSES: CourseModule[] = [
-  { id: '1', title: 'Market Structure & CRT', description: 'Understanding the foundation.', duration: '45m', level: 'beginner', completed: true, locked: false, contentType: 'video', content: 'https://www.youtube.com/embed/dQw4w9WgXcQ' },
-  {
-    id: '2', title: 'Fair Value Gaps Mastery', description: 'Identifying high probability gaps.', duration: '60m', level: 'intermediate', completed: false, locked: false, contentType: 'text', content: '## Fair Value Gaps\n\nAn FVG is a 3-candle pattern...',
-    quiz: {
-      id: 'q2',
-      passingScore: 70,
-      questions: [
-        { id: '2a', text: 'What is the minimum number of candles required to form an FVG?', options: ['2 Candles', '3 Candles', '5 Candles', '1 Candle'], correctOptionIndex: 1 },
-        { id: '2b', text: 'For a Bullish FVG, the gap exists between:', options: ['Candle 1 Low and Candle 3 High', 'Candle 1 High and Candle 3 Low', 'Candle 2 High and Candle 2 Low', 'None of the above'], correctOptionIndex: 1 },
-        { id: '2c', text: 'An FVG is considered "mitigated" when:', options: ['Price touches the gap', 'Price closes above the gap', 'Price never returns', 'The gap is too small'], correctOptionIndex: 0 },
-      ]
-    }
-  },
-  { id: '3', title: 'Liquidity Concepts', description: 'Where are the stops?', duration: '55m', level: 'intermediate', completed: false, locked: true, contentType: 'video' },
-  { id: '4', title: 'Advanced Executions', description: 'Precision entries.', duration: '90m', level: 'advanced', completed: false, locked: true, contentType: 'video' },
-];
-
 const INITIAL_ENTRIES: TradeEntry[] = [
   {
     id: '101', pair: 'EURUSD', type: 'buy', entryPrice: 1.0850, stopLoss: 1.0820, takeProfit: 1.0910,
@@ -131,7 +114,44 @@ function App() {
   const [journalEntries, setJournalEntries] = useState<TradeEntry[]>(INITIAL_ENTRIES);
   const [draftJournalEntry, setDraftJournalEntry] = useState<Partial<TradeEntry> | null>(null);
   const [tradeRules, setTradeRules] = useState<TradeRule[]>(MOCK_RULES);
-  const [courses, setCourses] = useState<CourseModule[]>(MOCK_COURSES);
+  const [courses, setCourses] = useState<CourseModule[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
+
+  // Fetch real courses data
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        setLoadingCourses(true);
+        const courseModules = await courseService.getModules();
+        setCourses(courseModules);
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+        // Fallback to mock data on error
+        const mockCourses: CourseModule[] = [
+          { id: '1', title: 'Market Structure & CRT', description: 'Understanding the foundation.', duration: '45m', level: 'beginner', completed: true, locked: false, contentType: 'video', content: 'https://www.youtube.com/embed/dQw4w9WgXcQ' },
+          {
+            id: '2', title: 'Fair Value Gaps Mastery', description: 'Identifying high probability gaps.', duration: '60m', level: 'intermediate', completed: false, locked: false, contentType: 'text', content: '## Fair Value Gaps\n\nAn FVG is a 3-candle pattern...',
+            quiz: {
+              id: 'q2',
+              passingScore: 70,
+              questions: [
+                { id: '2a', text: 'What is the minimum number of candles required to form an FVG?', options: ['2 Candles', '3 Candles', '5 Candles', '1 Candle'], correctOptionIndex: 1 },
+                { id: '2b', text: 'For a Bullish FVG, the gap exists between:', options: ['Candle 1 Low and Candle 3 High', 'Candle 1 High and Candle 3 Low', 'Candle 2 High and Candle 2 Low', 'None of the above'], correctOptionIndex: 1 },
+                { id: '2c', text: 'An FVG is considered "mitigated" when:', options: ['Price touches the gap', 'Price closes above the gap', 'Price never returns', 'The gap is too small'], correctOptionIndex: 0 },
+              ]
+            }
+          },
+          { id: '3', title: 'Liquidity Concepts', description: 'Where are the stops?', duration: '55m', level: 'intermediate', completed: false, locked: true, contentType: 'video' },
+          { id: '4', title: 'Advanced Executions', description: 'Precision entries.', duration: '90m', level: 'advanced', completed: false, locked: true, contentType: 'video' },
+        ];
+        setCourses(mockCourses);
+      } finally {
+        setLoadingCourses(false);
+      }
+    };
+
+    fetchCourses();
+  }, []);
 
   // --- SUPABASE AUTH ---
   React.useEffect(() => {
@@ -464,6 +484,7 @@ function App() {
         case 'journal':
           return (
             <TradeJournal
+              user={user} // Add the missing user prop
               entries={journalEntries}
               onAddEntry={handleAddJournalEntry}
               draftEntry={draftJournalEntry}
@@ -629,7 +650,13 @@ function App() {
         onChangeView={setPortalView}
         onLogout={handleLogout}
       >
-        {renderContent()}
+        {loadingCourses ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-trade-neon"></div>
+          </div>
+        ) : (
+          renderContent()
+        )}
       </Layout>
     );
   }
