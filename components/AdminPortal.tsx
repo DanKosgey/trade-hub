@@ -1,24 +1,24 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-
-import { StudentProfile, CourseModule, SubscriptionPlan, PlanFeature, CommunityLink, TradeRule, TradeEntry } from '../types';
+import { User, StudentProfile, CourseModule, SubscriptionPlan, CommunityLink, TradeRule, TradeEntry } from '../types';
 import CourseManagementSystem from './enhanced/CourseManagementSystem';
 import RuleBuilder from './RuleBuilder';
 import AdminTradeJournal from './AdminTradeJournal';
 import { socialMediaService } from '../services/socialMediaService';
-import { 
-  Plus, Edit2, Trash2, Zap, Users, TrendingUp, AlertTriangle, 
-  Search, ShieldAlert, ArrowUpRight, ArrowDownRight, BarChart2, 
-  DollarSign, X, LayoutDashboard, BookOpen, Layers, PieChart as PieIcon, 
+import { notificationService } from '../services/notificationService';
+import {
+  Plus, Edit2, Trash2, Zap, Users, TrendingUp, AlertTriangle,
+  Search, ShieldAlert, ArrowUpRight, ArrowDownRight, BarChart2,
+  DollarSign, X, LayoutDashboard, BookOpen, Layers, PieChart as PieIcon,
   Activity, CreditCard, List as ListIcon, Grid as GridIcon, Mail, UserCheck,
-  BarChart3
+  BarChart3, FileText, Clock, CheckCircle, XCircle, RefreshCw
 } from 'lucide-react';
-import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
-  PieChart, Pie, AreaChart, Area, CartesianGrid, Legend 
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  PieChart, Pie, AreaChart, Area, CartesianGrid, Legend
 } from 'recharts';
-import { 
+import {
   fetchAllStudents, fetchAllTrades, fetchBusinessMetrics, fetchStudentWithTrades,
-  fetchRevenueGrowthData, fetchCourseCompletionData, fetchRuleViolationsData, fetchCourseEnrollmentCounts 
+  fetchRevenueGrowthData, fetchCourseCompletionData, fetchRuleViolationsData, fetchCourseEnrollmentCounts, fetchPendingApplications
 } from '../services/adminService';
 import { supabase } from '../supabase/client';
 import { journalService } from '../services/journalService';
@@ -26,7 +26,8 @@ import { journalService } from '../services/journalService';
 // ============== TYPES ==============
 interface AdminPortalProps {
   courses: CourseModule[];
-  initialTab?: 'overview' | 'trades' | 'analytics' | 'directory' | 'settings' | 'rules' | 'content';
+  initialTab?: 'overview' | 'trades' | 'analytics' | 'directory' | 'settings' | 'rules' | 'content' | 'applications' | 'journal' | 'admin-analytics';
+  user: User;
 }
 
 interface ClassStats {
@@ -63,9 +64,8 @@ interface Trade {
 }
 
 // ============== SUB-COMPONENTS ==============
-
 // Community Link Form Component
-const CommunityLinkForm: React.FC<{ 
+const CommunityLinkForm: React.FC<{
   link?: CommunityLink;
   onSubmit: (link: Omit<CommunityLink, 'id' | 'createdAt' | 'updatedAt'> | Partial<CommunityLink>) => void;
   onCancel: () => void;
@@ -131,7 +131,7 @@ const CommunityLinkForm: React.FC<{
         </form>
         <div className="p-4 border-t border-gray-700 flex justify-end gap-2">
           <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg font-bold">Cancel</button>
-          <button type="submit" onClick={handleSubmit} className="px-4 py-2 bg-trade-neon text-black font-bold rounded-lg hover:bg-green-400">{link ? 'Update' : 'Create'}</button>
+          <button type="submit" className="px-4 py-2 bg-trade-neon text-black font-bold rounded-lg hover:bg-green-400">{link ? 'Update' : 'Create'}</button>
         </div>
       </div>
     </div>
@@ -139,15 +139,19 @@ const CommunityLinkForm: React.FC<{
 };
 
 // Plan Form Component
-const PlanForm: React.FC<{ 
+const PlanForm: React.FC<{
   plan?: SubscriptionPlan;
   onSubmit: (plan: Omit<SubscriptionPlan, 'id' | 'createdAt' | 'updatedAt'> | Partial<SubscriptionPlan>) => void;
   onCancel: () => void;
 }> = ({ plan, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
-    name: plan?.name || '', description: plan?.description || '', price: plan?.price || 0,
-    interval: plan?.interval || 'one-time', features: plan?.features?.join('\n') || '',
-    isActive: plan?.isActive ?? true, sortOrder: plan?.sortOrder || 0
+    name: plan?.name || '',
+    description: plan?.description || '',
+    price: plan?.price || 0,
+    interval: plan?.interval || 'one-time',
+    features: plan?.features?.join('\n') || '',
+    isActive: plan?.isActive ?? true,
+    sortOrder: plan?.sortOrder || 0
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -202,7 +206,7 @@ const PlanForm: React.FC<{
         </form>
         <div className="p-4 border-t border-gray-700 flex justify-end gap-2">
           <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg font-bold">Cancel</button>
-          <button type="submit" onClick={handleSubmit} className="px-4 py-2 bg-trade-neon text-black font-bold rounded-lg hover:bg-green-400">{plan ? 'Update' : 'Create'}</button>
+          <button type="submit" className="px-4 py-2 bg-trade-neon text-black font-bold rounded-lg hover:bg-green-400">{plan ? 'Update' : 'Create'}</button>
         </div>
       </div>
     </div>
@@ -277,64 +281,106 @@ const StudentDetailModal: React.FC<{ student: StudentProfile; onClose: () => voi
 );
 
 // ============== MAIN COMPONENT ==============
-const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overview' }) => {
-  const [activeTab, setActiveTab] = useState<'overview'|'trades'|'analytics'|'directory'|'settings'|'rules'|'content'|'journal'|'admin-analytics'>(initialTab);
-  const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
-  const [students, setStudents] = useState<StudentProfile[]>([]);
+const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overview', user }) => {
+  // State
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [classStats, setClassStats] = useState<ClassStats>({ totalPnL: 0, avgWinRate: 0, atRiskCount: 0, totalVolume: 0, pnlData: [] });
+  const [students, setStudents] = useState<StudentProfile[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
+  const [businessMetrics, setBusinessMetrics] = useState<BusinessMetrics>({
+    mrr: 0,
+    totalRevenue: 0,
+    churnRate: 0,
+    growthPercentage: 0,
+    tierData: [],
+    revenueGrowthData: [],
+    courseCompletionData: [],
+    violationData: []
+  });
+  const [communityLinks, setCommunityLinks] = useState<CommunityLink[]>([]);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [editingLink, setEditingLink] = useState<CommunityLink | null>(null);
+  const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [showPlanForm, setShowPlanForm] = useState(false);
   const [directorySearch, setDirectorySearch] = useState('');
-  const [directoryViewMode, setDirectoryViewMode] = useState<'grid'|'list'>('grid');
-  const [directoryFilter, setDirectoryFilter] = useState<'all'|'active'|'at-risk'|'inactive'>('all');
+  const [directoryFilter, setDirectoryFilter] = useState<'all' | 'active' | 'at-risk' | 'inactive'>('all');
+  const [directoryViewMode, setDirectoryViewMode] = useState<'grid' | 'list'>('grid');
   const [journalSearch, setJournalSearch] = useState('');
   const [filterPair, setFilterPair] = useState('all');
   const [filterOutcome, setFilterOutcome] = useState('all');
+  const [pendingApplications, setPendingApplications] = useState<StudentProfile[]>([]);
   const [allTrades, setAllTrades] = useState<Trade[]>([]);
-  const [filteredTrades, setFilteredTrades] = useState<Trade[]>([]);
+  const [classStats, setClassStats] = useState<ClassStats>({
+    totalPnL: 0,
+    avgWinRate: 0,
+    atRiskCount: 0,
+    totalVolume: 0,
+    pnlData: []
+  });
   const [uniquePairs, setUniquePairs] = useState<string[]>([]);
-  const [businessMetrics, setBusinessMetrics] = useState<BusinessMetrics>({ mrr: 0, totalRevenue: 0, churnRate: 0, growthPercentage: 0, tierData: [], revenueGrowthData: [], courseCompletionData: [], violationData: [] });
-  const [communityLinks, setCommunityLinks] = useState<CommunityLink[]>([]);
-  const [editingCommunityLink, setEditingCommunityLink] = useState<CommunityLink | null>(null);
-  const [showCommunityLinkForm, setShowCommunityLinkForm] = useState(false);
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
-  const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
-  const [showPlanForm, setShowPlanForm] = useState(false);
+  const [filteredTrades, setFilteredTrades] = useState<Trade[]>([]);
   const [tradeRules, setTradeRules] = useState<TradeRule[]>([]);
-  // Admin analytics state
   const [adminTrades, setAdminTrades] = useState<TradeEntry[]>([]);
   const [adminAnalyticsLoading, setAdminAnalyticsLoading] = useState(true);
 
-  // Memoize the setTradeRules function to prevent unnecessary re-renders
+  // Memoized setTradeRules to prevent re-renders
   const setTradeRulesMemo = useCallback((rules: TradeRule[]) => {
     setTradeRules(rules);
   }, []);
 
-  useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [studentsData, tradesData, metrics, revenueData, courseEnrollment, violations, links, plansData] = await Promise.all([
-          fetchAllStudents(), fetchAllTrades(), fetchBusinessMetrics(), fetchRevenueGrowthData(),
-          fetchCourseEnrollmentCounts(), fetchRuleViolationsData(), socialMediaService.getAllCommunityLinks(), socialMediaService.getAllSubscriptionPlans()
+        const [
+          studentsData,
+          tradesData,
+          metrics,
+          revenueData,
+          courseEnrollment,
+          violations,
+          links,
+          plansData
+        ] = await Promise.all([
+          fetchAllStudents(),
+          fetchAllTrades(),
+          fetchBusinessMetrics(),
+          fetchRevenueGrowthData(),
+          fetchCourseEnrollmentCounts(),
+          fetchRuleViolationsData(),
+          socialMediaService.getAllCommunityLinks(),
+          socialMediaService.getAllSubscriptionPlans()
         ]);
+
         setStudents(studentsData || []);
         setAllTrades(tradesData || []);
         setCommunityLinks(links || []);
         setPlans(plansData || []);
         setBusinessMetrics({
-          mrr: metrics?.mrr || 0, 
-          totalRevenue: metrics?.totalRevenue || 0, 
-          churnRate: metrics?.churnRate || 0, 
-          growthPercentage: metrics?.growthPercentage || 0, 
+          mrr: metrics?.mrr || 0,
+          totalRevenue: metrics?.totalRevenue || 0,
+          churnRate: metrics?.churnRate || 0,
+          growthPercentage: metrics?.growthPercentage || 0,
           tierData: metrics?.tierData || [],
-          revenueGrowthData: revenueData?.length ? revenueData : [{month:'Jan',revenue:0},{month:'Feb',revenue:0}],
-          courseCompletionData: courseEnrollment?.length ? courseEnrollment.map(i => ({ name: i.name?.slice(0,20) || 'Unknown', completion: i.count > 0 ? Math.round((i.completed/i.count)*100) : 0 })) : [{name:'No data',completion:0}],
-          violationData: violations?.length ? violations.map(i => ({ rule: i.rule || 'Unknown', count: i.count || 0 })) : [{rule:'None',count:0}]
+          revenueGrowthData: revenueData || [],
+          courseCompletionData: courseEnrollment?.map(i => ({
+            name: i.name?.slice(0,20) || 'Unknown',
+            completion: i.count > 0 ? Math.round((i.completed / i.count) * 100) : 0
+          })) || [],
+          violationData: violations?.map(i => ({ rule: i.rule || 'Unknown', count: i.count || 0 })) || []
         });
-      } catch (err) { console.error(err); setError('Failed to load data.'); } finally { setLoading(false); }
+      } catch (err) {
+        console.error(err);
+        setError('Failed to load data.');
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, []);
@@ -349,39 +395,44 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
     setClassStats({ totalPnL, avgWinRate, atRiskCount, totalVolume, pnlData });
   }, [students]);
 
-  const filteredDirectoryStudents = students.filter(s => {
-    const search = (s.name?.toLowerCase().includes(directorySearch.toLowerCase())) || (s.email?.toLowerCase().includes(directorySearch.toLowerCase()));
-    return search && (directoryFilter === 'all' || s.status === directoryFilter);
-  });
+  const filteredDirectoryStudents = useMemo(() => {
+    return students.filter(s => {
+      const searchMatch = (s.name?.toLowerCase() || '').includes(directorySearch.toLowerCase()) || (s.email?.toLowerCase() || '').includes(directorySearch.toLowerCase());
+      return searchMatch && (directoryFilter === 'all' || s.status === directoryFilter);
+    });
+  }, [students, directorySearch, directoryFilter]);
 
   useEffect(() => {
     setUniquePairs(Array.from(new Set(allTrades.map(t => t.pair).filter(Boolean))));
     setFilteredTrades(allTrades.filter(t => {
-      const search = t.pair?.toLowerCase().includes(journalSearch.toLowerCase()) || t.studentName?.toLowerCase().includes(journalSearch.toLowerCase());
-      return search && (filterPair === 'all' || t.pair === filterPair) && (filterOutcome === 'all' || t.status === filterOutcome);
+      const searchMatch = (t.pair?.toLowerCase() || '').includes(journalSearch.toLowerCase()) || (t.studentName?.toLowerCase() || '').includes(journalSearch.toLowerCase());
+      return searchMatch && (filterPair === 'all' || t.pair === filterPair) && (filterOutcome === 'all' || t.status === filterOutcome);
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
   }, [allTrades, journalSearch, filterPair, filterOutcome]);
 
-  const tradeAnalytics = (() => {
-    const total = filteredTrades.length, wins = filteredTrades.filter(t => t.status === 'win').length, losses = filteredTrades.filter(t => t.status === 'loss').length;
+  const tradeAnalytics = useMemo(() => {
+    const total = filteredTrades.length;
+    const wins = filteredTrades.filter(t => t.status === 'win').length;
+    const losses = filteredTrades.filter(t => t.status === 'loss').length;
     const winRate = (wins + losses) > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
     const netPnL = filteredTrades.reduce((s, t) => s + (t.pnl || 0), 0);
     const pairStats: Record<string, number> = {};
-    filteredTrades.forEach(t => { if (t.pair) pairStats[t.pair] = (pairStats[t.pair] || 0) + (t.pnl || 0); });
-    return { total, wins, losses, winRate, netPnL, pairData: Object.entries(pairStats).map(([n, v]) => ({ name: n, value: v })).sort((a, b) => b.value - a.value) };
-  })();
+    filteredTrades.forEach(t => {
+      if (t.pair) pairStats[t.pair] = (pairStats[t.pair] || 0) + (t.pnl || 0);
+    });
+    const pairData = Object.entries(pairStats).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+    return { total, wins, losses, winRate, netPnL, pairData };
+  }, [filteredTrades]);
 
-  // Add useEffect to fetch admin trades for analytics
   useEffect(() => {
     const fetchAdminTrades = async () => {
       if (activeTab !== 'admin-analytics') return;
-      
       try {
         setAdminAnalyticsLoading(true);
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           const entries = await journalService.getJournalEntries(user.id);
-          setAdminTrades(entries);
+          setAdminTrades(entries || []);
         }
       } catch (err) {
         console.error('Error fetching admin trades:', err);
@@ -389,178 +440,380 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
         setAdminAnalyticsLoading(false);
       }
     };
-
     fetchAdminTrades();
   }, [activeTab]);
 
-  // Calculate admin analytics stats
-  const adminStats = useMemo(() => {
-    if (adminTrades.length === 0) {
-      return {
-        totalPnL: 0,
-        winRate: 0,
-        totalTrades: 0,
-        bestAsset: '-',
-        largestWin: 0,
-        largestLoss: 0,
-        profitFactor: 0,
-        pairStats: {} as Record<string, { wins: number; losses: number; pnl: number }>
-      };
+  useEffect(() => {
+    const fetchPending = async () => {
+      if (activeTab !== 'applications') return;
+      try {
+        console.log('Fetching pending applications...');
+        const apps = await fetchPendingApplications();
+        console.log('Pending applications fetched:', apps);
+        setPendingApplications(apps || []);
+      } catch (err) {
+        console.error('Error fetching pending applications:', err);
+      }
+    };
+    fetchPending();
+    
+    // Add a listener for changes to the profiles table for all pending tiers
+    const channel = supabase
+      .channel('pending-applications-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'profiles',
+          filter: 'subscription_tier=eq.elite-pending'
+        },
+        (payload) => {
+          console.log('New elite-pending application detected:', payload);
+          // Refetch pending applications when a new one is added
+          fetchPending();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'profiles',
+          filter: 'subscription_tier=eq.foundation-pending'
+        },
+        (payload) => {
+          console.log('New foundation-pending application detected:', payload);
+          // Refetch pending applications when a new one is added
+          fetchPending();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'profiles',
+          filter: 'subscription_tier=eq.professional-pending'
+        },
+        (payload) => {
+          console.log('New professional-pending application detected:', payload);
+          // Refetch pending applications when a new one is added
+          fetchPending();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: 'subscription_tier=eq.elite-pending'
+        },
+        (payload) => {
+          console.log('Elite-pending application updated:', payload);
+          // Refetch pending applications when one is updated
+          fetchPending();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: 'subscription_tier=eq.foundation-pending'
+        },
+        (payload) => {
+          console.log('Foundation-pending application updated:', payload);
+          // Refetch pending applications when one is updated
+          fetchPending();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: 'subscription_tier=eq.professional-pending'
+        },
+        (payload) => {
+          console.log('Professional-pending application updated:', payload);
+          // Refetch pending applications when one is updated
+          fetchPending();
+        }
+      )
+      .subscribe();
+      
+    // Cleanup function to unsubscribe when component unmounts
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeTab]);
+
+  const handleApproveApplication = async (studentId: string, approvedTier: string) => {
+    try {
+      await supabase.from('profiles').update({ subscription_tier: approvedTier }).eq('id', studentId);
+      await notificationService.createApplicationApprovedNotification(studentId);
+      setPendingApplications(prev => prev.filter(app => app.id !== studentId));
+      alert(`Application approved! User now has ${approvedTier} access.`);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to approve application.');
     }
+  };
+
+  const handleRejectApplication = async (studentId: string, rejectedTier: string) => {
+    try {
+      await supabase.from('profiles').update({ subscription_tier: rejectedTier }).eq('id', studentId);
+      await notificationService.createApplicationRejectedNotification(studentId);
+      setPendingApplications(prev => prev.filter(app => app.id !== studentId));
+      alert('Application rejected! User moved to free tier.');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to reject application.');
+    }
+  };
+
+  const handleLinkEdit = (link: CommunityLink) => {
+    setEditingLink(link);
+    setShowLinkForm(true);
+  };
+
+  const handleLinkDelete = async (linkId: string) => {
+    try {
+      await socialMediaService.deleteCommunityLink(linkId);
+      setCommunityLinks(prev => prev.filter(l => l.id !== linkId));
+      alert('Community link deleted.');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete community link.');
+    }
+  };
+
+  const handlePlanEdit = (plan: SubscriptionPlan) => {
+    setEditingPlan(plan);
+    setShowPlanForm(true);
+  };
+
+  const handlePlanDelete = async (planId: string) => {
+    try {
+      await socialMediaService.deleteSubscriptionPlan(planId);
+      setPlans(prev => prev.filter(p => p.id !== planId));
+      alert('Subscription plan deleted.');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete subscription plan.');
+    }
+  };
+
+  const handleStudentDetail = (student: StudentProfile) => {
+    setSelectedStudent(student);
+  };
+
+  const adminStats = useMemo(() => {
+    if (!adminTrades.length) return {
+      totalPnL: 0,
+      winRate: 0,
+      totalTrades: 0,
+      bestAsset: '-',
+      largestWin: 0,
+      largestLoss: 0,
+      profitFactor: 0,
+      pairStats: {}
+    };
 
     const closedTrades = adminTrades.filter(t => t.status !== 'pending');
     const wins = closedTrades.filter(t => t.status === 'win').length;
     const losses = closedTrades.filter(t => t.status === 'loss').length;
     const winRate = closedTrades.length > 0 ? Math.round((wins / closedTrades.length) * 100) : 0;
     const totalPnL = adminTrades.reduce((sum, trade) => sum + (trade.pnl || 0), 0);
-    
-    const largestWin = Math.max(...adminTrades.filter(t => t.pnl && t.pnl > 0).map(t => t.pnl || 0), 0);
-    const largestLoss = Math.min(...adminTrades.filter(t => t.pnl && t.pnl < 0).map(t => t.pnl || 0), 0);
-    
+    const largestWin = Math.max(...adminTrades.filter(t => (t.pnl || 0) > 0).map(t => t.pnl || 0), 0);
+    const largestLoss = Math.min(...adminTrades.filter(t => (t.pnl || 0) < 0).map(t => t.pnl || 0), 0);
     const winSum = adminTrades.filter(t => t.status === 'win').reduce((sum, t) => sum + (t.pnl || 0), 0);
     const lossSum = Math.abs(adminTrades.filter(t => t.status === 'loss').reduce((sum, t) => sum + (t.pnl || 0), 0));
     const profitFactor = lossSum > 0 ? winSum / lossSum : 0;
-    
-    // Pair statistics
+
     const pairStats: Record<string, { wins: number; losses: number; pnl: number }> = {};
     adminTrades.forEach(trade => {
       const pair = trade.pair || 'Unknown';
-      if (!pairStats[pair]) {
-        pairStats[pair] = { wins: 0, losses: 0, pnl: 0 };
-      }
+      if (!pairStats[pair]) pairStats[pair] = { wins: 0, losses: 0, pnl: 0 };
       if (trade.status === 'win') pairStats[pair].wins++;
       if (trade.status === 'loss') pairStats[pair].losses++;
       pairStats[pair].pnl += trade.pnl || 0;
     });
-    
-    // Find best performing asset
-    const bestAsset = Object.entries(pairStats)
-      .sort(([, a], [, b]) => (b as { wins: number; losses: number; pnl: number }).pnl - (a as { wins: number; losses: number; pnl: number }).pnl)[0]?.[0] || '-';
 
-    return {
-      totalPnL,
-      winRate,
-      totalTrades: adminTrades.length,
-      bestAsset,
-      largestWin,
-      largestLoss,
-      profitFactor,
-      pairStats
-    };
+    const bestAsset = Object.entries(pairStats).sort(([,a],[,b]) => b.pnl - a.pnl)[0]?.[0] || '-';
+
+    return { totalPnL, winRate, totalTrades: adminTrades.length, bestAsset, largestWin, largestLoss, profitFactor, pairStats };
   }, [adminTrades]);
 
-  // Calculate P&L over time data for the chart
   const pnlOverTimeData = useMemo(() => {
-    if (adminTrades.length === 0) return [];
-    
-    // Group trades by date and calculate cumulative P&L
+    if (!adminTrades.length) return [];
+
+    const sortedTrades = [...adminTrades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const tradesByDate: Record<string, number> = {};
-    
-    // Sort trades by date
-    const sortedTrades = [...adminTrades].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
-    
-    // Calculate daily P&L
     sortedTrades.forEach(trade => {
       const date = new Date(trade.date).toLocaleDateString();
-      if (!tradesByDate[date]) {
-        tradesByDate[date] = 0;
-      }
-      tradesByDate[date] += trade.pnl || 0;
+      tradesByDate[date] = (tradesByDate[date] || 0) + (trade.pnl || 0);
     });
-    
-    // Convert to array and calculate cumulative P&L
-    const dates = Object.keys(tradesByDate).sort((a, b) => 
-      new Date(a).getTime() - new Date(b).getTime()
-    );
-    
+
+    const dates = Object.keys(tradesByDate).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     let cumulativePnL = 0;
     return dates.map(date => {
       cumulativePnL += tradesByDate[date];
-      return {
-        date,
-        dailyPnL: tradesByDate[date],
-        cumulativePnL
-      };
+      return { date, dailyPnL: tradesByDate[date], cumulativePnL };
     });
   }, [adminTrades]);
 
-  const handleCreateCommunityLink = async (link: any) => { const n = await socialMediaService.createCommunityLink(link); if (n) { setCommunityLinks(p => [...p, n]); setShowCommunityLinkForm(false); } };
-  const handleUpdateCommunityLink = async (id: string, u: any) => { if (await socialMediaService.updateCommunityLink(id, u)) { setCommunityLinks(p => p.map(l => l.id === id ? { ...l, ...u } : l)); setEditingCommunityLink(null); } };
-  const handleDeleteCommunityLink = async (id: string) => { if (window.confirm('Delete?') && await socialMediaService.deleteCommunityLink(id)) setCommunityLinks(p => p.filter(l => l.id !== id)); };
-  const handleCreatePlan = async (plan: any) => { const n = await socialMediaService.createSubscriptionPlan(plan); if (n) { setPlans(p => [...p, n]); setShowPlanForm(false); } };
-  const handleUpdatePlan = async (id: string, u: any) => { if (await socialMediaService.updateSubscriptionPlan(id, u)) { setPlans(p => p.map(l => l.id === id ? { ...l, ...u } : l)); setEditingPlan(null); } };
-  const handleDeletePlan = async (id: string) => { if (window.confirm('Delete?') && await socialMediaService.deleteSubscriptionPlan(id)) setPlans(p => p.filter(l => l.id !== id)); };
-  const handleStudentSelect = async (student: StudentProfile) => { try { setSelectedStudent(await fetchStudentWithTrades(student.id) || student); } catch { setSelectedStudent(student); } };
+  const handleCreateCommunityLink = async (link: any) => {
+    const newLink = await socialMediaService.createCommunityLink(link);
+    if (newLink) {
+      setCommunityLinks(prev => [...prev, newLink]);
+      setShowLinkForm(false);
+    }
+  };
 
-  if (loading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-trade-neon"></div></div>;
-  if (error) return <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-6 text-center"><p className="text-red-200">{error}</p><button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white">Retry</button></div>;
+  const handleUpdateCommunityLink = async (id: string, updates: any) => {
+    if (await socialMediaService.updateCommunityLink(id, updates)) {
+      setCommunityLinks(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
+      setEditingLink(null);
+    }
+  };
+
+  const handleDeleteCommunityLink = async (id: string) => {
+    if (window.confirm('Delete this link?') && await socialMediaService.deleteCommunityLink(id)) {
+      setCommunityLinks(prev => prev.filter(l => l.id !== id));
+    }
+  };
+
+  const handleCreatePlan = async (plan: any) => {
+    const newPlan = await socialMediaService.createSubscriptionPlan(plan);
+    if (newPlan) {
+      setPlans(prev => [...prev, newPlan]);
+      setShowPlanForm(false);
+    }
+  };
+
+  const handleUpdatePlan = async (id: string, updates: any) => {
+    if (await socialMediaService.updateSubscriptionPlan(id, updates)) {
+      setPlans(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+      setEditingPlan(null);
+    }
+  };
+
+  const handleDeletePlan = async (id: string) => {
+    if (window.confirm('Delete this plan?') && await socialMediaService.deleteSubscriptionPlan(id)) {
+      setPlans(prev => prev.filter(p => p.id !== id));
+    }
+  };
+
+  const handleStudentSelect = async (student: StudentProfile) => {
+    try {
+      const fullStudent = await fetchStudentWithTrades(student.id);
+      setSelectedStudent(fullStudent || student);
+    } catch {
+      setSelectedStudent(student);
+    }
+  };
+
+  if (loading) return <div className="flex justify-center items-center h-screen"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-trade-neon"></div></div>;
+
+  if (error) return <div className="bg-red-900/30 border border-red-500 rounded-2xl p-8 text-center"><p className="text-red-300 text-lg mb-4">{error}</p><button onClick={() => location.reload()} className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-lg text-white font-bold">Retry Load</button></div>;
 
   const tabs = [
-    { id: 'overview', label: 'Command Center', icon: LayoutDashboard },
-    { id: 'directory', label: 'Directory', icon: Users },
-    { id: 'trades', label: 'Trade Analysis', icon: Layers },
-    { id: 'analytics', label: 'Analytics', icon: PieIcon },
-    { id: 'content', label: 'Content Mgmt', icon: BookOpen },
-    { id: 'rules', label: 'Rule Engine', icon: Zap },
-    { id: 'journal', label: 'My Trades', icon: DollarSign },
-    { id: 'admin-analytics', label: 'Admin Analytics', icon: BarChart3 },
-    { id: 'settings', label: 'Settings', icon: CreditCard },
-  ] as const;
+    { id: 'overview' as const, label: 'Command Center', icon: LayoutDashboard },
+    { id: 'directory' as const, label: 'Directory', icon: Users },
+    { id: 'trades' as const, label: 'Trade Analysis', icon: Layers },
+    { id: 'analytics' as const, label: 'Analytics', icon: PieIcon },
+    { id: 'applications' as const, label: 'Applications', icon: FileText },
+    { id: 'content' as const, label: 'Content Mgmt', icon: BookOpen },
+    { id: 'rules' as const, label: 'Rule Engine', icon: Zap },
+    { id: 'journal' as const, label: 'My Trades', icon: DollarSign },
+    { id: 'admin-analytics' as const, label: 'Admin Analytics', icon: BarChart3 },
+    { id: 'settings' as const, label: 'Settings', icon: CreditCard },
+  ];
 
   return (
-    <div className="space-y-6 md:space-y-8 text-white pb-10">
-      {/* Header & Tabs */}
-      <div className="flex flex-col lg:flex-row justify-between lg:items-end gap-6">
+    <div className="space-y-8 text-white min-h-screen bg-gradient-to-br from-gray-900 to-black p-6 md:p-8">
+      {/* Enhanced Header with Animation */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 animate-fade-in">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-3"><ShieldAlert className="h-6 w-6 md:h-8 md:w-8 text-trade-neon" /> Admin Portal</h1>
-          <p className="text-gray-400 mt-1 text-sm md:text-base">Manage students, risk, and aggregated data.</p>
+          <h1 className="text-3xl md:text-4xl font-extrabold flex items-center gap-3 text-transparent bg-clip-text bg-gradient-to-r from-trade-neon to-blue-400"><ShieldAlert className="h-8 w-8 text-trade-neon animate-pulse" /> Admin Portal</h1>
+          <p className="text-gray-300 mt-2 text-base">Oversee students, risks, and business insights with precision.</p>
         </div>
-        <div className="flex flex-wrap gap-2 pb-2 md:pb-0 min-h-[40px] bg-gray-900/50 p-2 rounded-lg border border-gray-700">
-          {tabs.map(tab => { const Icon = tab.icon; return (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition whitespace-nowrap ${activeTab === tab.id ? 'bg-gray-700 text-white shadow-lg ring-1 ring-gray-600' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}>
-              <Icon className="h-4 w-4" /><span className={activeTab === tab.id ? "underline decoration-trade-neon decoration-2 underline-offset-4" : ""}>{tab.label}</span>
-            </button>
-          ); })}
+        <div className="flex flex-wrap gap-2 bg-gray-800/50 p-2 rounded-xl border border-gray-700/50 backdrop-blur-sm shadow-lg">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${activeTab === tab.id ? 'bg-trade-neon text-black shadow-md scale-105' : 'text-gray-300 hover:text-white hover:bg-gray-700/50'}`}>
+                <Icon className="h-4 w-4" /> {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* OVERVIEW TAB */}
       {activeTab === 'overview' && (
-        <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            <div className="bg-trade-dark p-5 md:p-6 rounded-xl border border-gray-700">
-              <div className="flex items-center gap-2 text-gray-400 mb-2 text-sm"><DollarSign className="h-4 w-4" /> Class Total P&L</div>
-              <div className={`text-2xl md:text-3xl font-bold ${classStats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>{classStats.totalPnL >= 0 ? '+' : ''}${classStats.totalPnL.toLocaleString()}</div>
+        <div className="space-y-8 animate-slide-up">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 backdrop-blur-sm shadow-xl hover:scale-105 transition-transform">
+              <div className="flex items-center gap-3 text-gray-300 mb-3"><DollarSign className="h-5 w-5 text-green-400" /> Class Total P&L</div>
+              <div className={`text-3xl font-extrabold ${classStats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>{classStats.totalPnL >= 0 ? '+' : ''}${classStats.totalPnL.toLocaleString()}</div>
             </div>
-            <div className="bg-trade-dark p-5 md:p-6 rounded-xl border border-gray-700">
-              <div className="flex items-center gap-2 text-gray-400 mb-2 text-sm"><BarChart2 className="h-4 w-4" /> Avg Win Rate</div>
-              <div className="text-2xl md:text-3xl font-bold text-blue-400">{classStats.avgWinRate}%</div>
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 backdrop-blur-sm shadow-xl hover:scale-105 transition-transform">
+              <div className="flex items-center gap-3 text-gray-300 mb-3"><BarChart2 className="h-5 w-5 text-blue-400" /> Avg Win Rate</div>
+              <div className="text-3xl font-extrabold text-blue-400">{classStats.avgWinRate}%</div>
             </div>
-            <div className="bg-trade-dark p-5 md:p-6 rounded-xl border border-gray-700 relative overflow-hidden">
-              <div className="flex items-center gap-2 text-gray-400 mb-2 text-sm"><AlertTriangle className="h-4 w-4 text-red-500" /> At-Risk Students</div>
-              <div className="text-2xl md:text-3xl font-bold text-red-500">{classStats.atRiskCount}</div>
-              {classStats.atRiskCount > 0 && <div className="absolute bottom-0 left-0 w-full h-1 bg-red-500 animate-pulse"></div>}
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 backdrop-blur-sm shadow-xl hover:scale-105 transition-transform relative overflow-hidden">
+              <div className="flex items-center gap-3 text-gray-300 mb-3"><AlertTriangle className="h-5 w-5 text-red-400 animate-pulse" /> At-Risk Students</div>
+              <div className="text-3xl font-extrabold text-red-400">{classStats.atRiskCount}</div>
+              {classStats.atRiskCount > 0 && <div className="absolute bottom-0 left-0 w-full h-1 bg-red-400 animate-pulse opacity-50"></div>}
             </div>
-            <div className="bg-trade-dark p-5 md:p-6 rounded-xl border border-gray-700">
-              <div className="flex items-center gap-2 text-gray-400 mb-2 text-sm"><TrendingUp className="h-4 w-4" /> Total Trades</div>
-              <div className="text-2xl md:text-3xl font-bold text-purple-400">{classStats.totalVolume}</div>
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 backdrop-blur-sm shadow-xl hover:scale-105 transition-transform">
+              <div className="flex items-center gap-3 text-gray-300 mb-3"><TrendingUp className="h-5 w-5 text-purple-400" /> Total Trades</div>
+              <div className="text-3xl font-extrabold text-purple-400">{classStats.totalVolume}</div>
             </div>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 bg-trade-dark p-6 rounded-xl border border-gray-700">
-              <h3 className="font-bold text-lg mb-6">P&L Distribution</h3>
-              <div className="h-64 w-full" style={{minHeight: '200px'}}>{classStats.pnlData.length > 0 ? <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}><BarChart data={classStats.pnlData}><XAxis dataKey="name" stroke="#64748b" fontSize={12} /><YAxis stroke="#64748b" fontSize={12} /><Tooltip cursor={{fill:'#1e293b'}} contentStyle={{backgroundColor:'#0f172a',border:'1px solid #334155',borderRadius:'8px'}} /><Bar dataKey="pnl" radius={[4,4,0,0]}>{classStats.pnlData.map((e,i) => <Cell key={i} fill={e.color} />)}</Bar></BarChart></ResponsiveContainer> : <div className="flex items-center justify-center h-full text-gray-500">No data available</div>}</div>
+            <div className="lg:col-span-2 bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 backdrop-blur-sm shadow-xl">
+              <h3 className="font-bold text-xl mb-6 text-gray-200">P&L Distribution</h3>
+              <div className="h-72">
+                {classStats.pnlData.length > 0 ? (
+                  <ResponsiveContainer>
+                    <BarChart data={classStats.pnlData}>
+                      <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
+                      <YAxis stroke="#94a3b8" fontSize={12} />
+                      <Tooltip contentStyle={{backgroundColor: '#1f2937', border: '1px solid #475569', borderRadius: '8px'}} />
+                      <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
+                        {classStats.pnlData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">No data available</div>
+                )}
+              </div>
             </div>
-            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700 flex flex-col">
-              <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>Risk Radar</h3>
-              <div className="flex-1 overflow-y-auto space-y-3 pr-2 max-h-[250px]">
-                {students.filter(s => s.status === 'at-risk').length ? students.filter(s => s.status === 'at-risk').map(s => (
-                  <div key={s.id} onClick={() => handleStudentSelect(s)} className="p-3 bg-red-900/10 border border-red-500/30 rounded-lg cursor-pointer hover:bg-red-900/20">
-                    <div className="flex justify-between items-start"><div><h4 className="font-bold text-red-200">{s.name || 'Unknown'}</h4><p className="text-xs text-red-400/70">High Drawdown</p></div><span className="text-xs font-mono font-bold text-red-400">DD: {s.stats?.currentDrawdown || 0}%</span></div>
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 backdrop-blur-sm shadow-xl">
+              <h3 className="font-bold text-xl mb-6 text-gray-200 flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-red-400" /> Risk Radar</h3>
+              <div className="space-y-4 overflow-y-auto max-h-72 pr-2">
+                {students.filter(s => s.status === 'at-risk').map(s => (
+                  <div key={s.id} onClick={() => handleStudentSelect(s)} className="p-4 bg-red-900/20 border border-red-500/30 rounded-xl cursor-pointer hover:bg-red-900/30 transition-colors">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-bold text-red-200">{s.name || 'Unknown'}</h4>
+                        <p className="text-xs text-red-300">High Drawdown</p>
+                      </div>
+                      <span className="text-xs font-bold text-red-300">DD: {s.stats?.currentDrawdown || 0}%</span>
+                    </div>
                   </div>
-                )) : <div className="text-center py-8 text-gray-500"><ShieldAlert className="h-8 w-8 mx-auto mb-2 opacity-50" />No students flagged.</div>}
+                ))}
+                {students.filter(s => s.status === 'at-risk').length === 0 && <div className="text-center py-8 text-gray-400">No students at risk.</div>}
               </div>
             </div>
           </div>
@@ -569,51 +822,97 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
 
       {/* DIRECTORY TAB */}
       {activeTab === 'directory' && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="bg-trade-dark rounded-xl border border-gray-700 p-4 flex flex-col md:flex-row gap-4 justify-between items-center">
-            <div className="relative w-full md:w-72"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" /><input type="text" placeholder="Search students..." className="w-full bg-gray-800 border border-gray-600 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-trade-accent" value={directorySearch} onChange={e => setDirectorySearch(e.target.value)} /></div>
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <select className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 outline-none" value={directoryFilter} onChange={e => setDirectoryFilter(e.target.value as any)}><option value="all">All</option><option value="active">Active</option><option value="at-risk">At Risk</option><option value="inactive">Inactive</option></select>
-              <div className="flex bg-gray-800 p-1 rounded-lg border border-gray-600">
-                <button onClick={() => setDirectoryViewMode('grid')} className={`p-2 rounded ${directoryViewMode === 'grid' ? 'bg-gray-600 text-white' : 'text-gray-400'}`}><GridIcon className="h-4 w-4" /></button>
-                <button onClick={() => setDirectoryViewMode('list')} className={`p-2 rounded ${directoryViewMode === 'list' ? 'bg-gray-600 text-white' : 'text-gray-400'}`}><ListIcon className="h-4 w-4" /></button>
+        <div className="space-y-8 animate-slide-up">
+          <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6 flex flex-col md:flex-row gap-4 justify-between items-center shadow-xl">
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input type="text" placeholder="Search students by name or email..." className="w-full bg-gray-900/50 border border-gray-600/50 rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:border-trade-neon transition-all" value={directorySearch} onChange={e => setDirectorySearch(e.target.value)} />
+            </div>
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              <select className="bg-gray-900/50 border border-gray-600/50 rounded-xl px-4 py-3 text-sm text-gray-300 outline-none focus:border-trade-neon" value={directoryFilter} onChange={e => setDirectoryFilter(e.target.value as any)}>
+                <option value="all">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="at-risk">At Risk</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <div className="flex bg-gray-900/50 p-1 rounded-xl border border-gray-600/50">
+                <button onClick={() => setDirectoryViewMode('grid')} className={`px-4 py-2 rounded-l-xl ${directoryViewMode === 'grid' ? 'bg-trade-neon text-black' : 'text-gray-400 hover:bg-gray-800/50'}`}><GridIcon className="h-5 w-5" /></button>
+                <button onClick={() => setDirectoryViewMode('list')} className={`px-4 py-2 rounded-r-xl ${directoryViewMode === 'list' ? 'bg-trade-neon text-black' : 'text-gray-400 hover:bg-gray-800/50'}`}><ListIcon className="h-5 w-5" /></button>
               </div>
             </div>
           </div>
-          {!filteredDirectoryStudents.length ? <div className="text-center py-16 bg-trade-dark border border-gray-700 border-dashed rounded-xl"><Users className="h-12 w-12 mx-auto text-gray-600 mb-4" /><h3 className="text-lg font-bold text-gray-400">No students found</h3></div>
-          : directoryViewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {!filteredDirectoryStudents.length ? (
+            <div className="text-center py-16 bg-gray-800/50 border border-gray-700/50 border-dashed rounded-2xl shadow-xl">
+              <Users className="h-16 w-16 mx-auto text-gray-500 mb-4" />
+              <h3 className="text-2xl font-bold text-gray-300">No students found</h3>
+            </div>
+          ) : directoryViewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredDirectoryStudents.map(s => (
-                <div key={s.id} onClick={() => handleStudentSelect(s)} className="group bg-trade-dark hover:bg-gray-800 border border-gray-700 hover:border-trade-accent rounded-xl p-5 cursor-pointer">
+                <div key={s.id} onClick={() => handleStudentSelect(s)} className="group bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700/50 hover:border-trade-neon rounded-2xl p-6 cursor-pointer transition-all duration-300 shadow-lg hover:shadow-xl">
                   <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-lg ${s.status === 'at-risk' ? 'bg-red-500/20 text-red-500' : s.tier === 'elite' ? 'bg-purple-600 text-white' : 'bg-trade-accent/20 text-trade-accent'}`}>{s.name?.charAt(0) || '?'}</div>
-                      <div><h4 className="font-bold text-white">{s.name || 'Unknown'}</h4><span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${s.tier === 'elite' ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-700 text-gray-400'}`}>{s.tier}</span></div>
+                    <div className="flex items-center gap-4">
+                      <div className={`h-12 w-12 rounded-full flex items-center justify-center font-bold text-xl ${s.status === 'at-risk' ? 'bg-red-500/30 text-red-400' : s.tier === 'elite' ? 'bg-purple-600/30 text-purple-400' : 'bg-trade-neon/30 text-trade-neon'}`}>{s.name?.charAt(0) || '?'}</div>
+                      <div>
+                        <h4 className="font-bold text-white">{s.name || 'Unknown'}</h4>
+                        <span className={`text-xs px-3 py-1 rounded-full uppercase font-bold ${s.tier === 'elite' ? 'bg-purple-500/20 text-purple-400' : 'bg-gray-700/50 text-gray-300'}`}>{s.tier}</span>
+                      </div>
                     </div>
-                    {s.status === 'at-risk' && <AlertTriangle className="h-5 w-5 text-red-500 animate-pulse" />}
+                    {s.status === 'at-risk' && <AlertTriangle className="h-6 w-6 text-red-400 animate-pulse" />}
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                    <div className="bg-gray-900/50 p-2 rounded"><span className="block text-xs text-gray-500">Win Rate</span><span className={`font-bold ${(s.stats?.winRate||0) >= 50 ? 'text-green-400' : 'text-red-400'}`}>{s.stats?.winRate||0}%</span></div>
-                    <div className="bg-gray-900/50 p-2 rounded"><span className="block text-xs text-gray-500">P&L</span><span className={`font-bold ${(s.stats?.totalPnL||0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>${s.stats?.totalPnL||0}</span></div>
+                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                    <div className="bg-gray-900/50 p-3 rounded-xl">
+                      <span className="block text-xs text-gray-400">Win Rate</span>
+                      <span className={`font-bold ${(s.stats?.winRate || 0) >= 50 ? 'text-green-400' : 'text-red-400'}`}>{s.stats?.winRate || 0}%</span>
+                    </div>
+                    <div className="bg-gray-900/50 p-3 rounded-xl">
+                      <span className="block text-xs text-gray-400">P&L</span>
+                      <span className={`font-bold ${(s.stats?.totalPnL || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>${s.stats?.totalPnL || 0}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs pt-3 border-t border-gray-700/50"><span className="text-gray-500">Joined {new Date(s.joinedDate).toLocaleDateString()}</span><span className="text-trade-accent group-hover:underline flex items-center gap-1">View <ArrowUpRight className="h-3 w-3" /></span></div>
+                  <div className="flex items-center justify-between text-xs pt-4 border-t border-gray-700/30">
+                    <span className="text-gray-400">Joined {new Date(s.joinedDate).toLocaleDateString()}</span>
+                    <span className="text-trade-neon group-hover:underline flex items-center gap-1">View Profile <ArrowUpRight className="h-4 w-4" /></span>
+                  </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="bg-trade-dark rounded-xl border border-gray-700 overflow-x-auto">
-              <table className="w-full text-left text-sm min-w-[800px]">
-                <thead className="bg-gray-800 text-gray-400"><tr><th className="p-4">Student</th><th className="p-4">Status</th><th className="p-4">Tier</th><th className="p-4">Win Rate</th><th className="p-4">P&L</th><th className="p-4">Trades</th><th className="p-4 text-right">Actions</th></tr></thead>
-                <tbody className="divide-y divide-gray-700">
+            <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 overflow-x-auto shadow-xl">
+              <table className="w-full text-left text-sm min-w-max">
+                <thead className="bg-gray-900/50 text-gray-300 sticky top-0">
+                  <tr>
+                    <th className="p-4">Student</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4">Tier</th>
+                    <th className="p-4">Win Rate</th>
+                    <th className="p-4">P&L</th>
+                    <th className="p-4">Trades</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700/50">
                   {filteredDirectoryStudents.map(s => (
-                    <tr key={s.id} className="hover:bg-gray-800/50">
-                      <td className="p-4"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${s.tier === 'elite' ? 'bg-purple-600 text-white' : 'bg-gray-700'}`}>{s.name?.charAt(0)||'?'}</div><div><div className="font-bold">{s.name||'Unknown'}</div><div className="text-xs text-gray-500">{s.email}</div></div></div></td>
-                      <td className="p-4"><span className={`text-xs font-bold uppercase px-2 py-1 rounded ${s.status === 'active' ? 'bg-green-500/10 text-green-400' : s.status === 'at-risk' ? 'bg-red-500/10 text-red-400' : 'bg-gray-700 text-gray-400'}`}>{s.status}</span></td>
-                      <td className="p-4 capitalize text-gray-300">{s.tier}</td>
-                      <td className={`p-4 font-bold ${(s.stats?.winRate||0) >= 50 ? 'text-green-400' : 'text-red-400'}`}>{s.stats?.winRate||0}%</td>
-                      <td className={`p-4 font-bold ${(s.stats?.totalPnL||0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>${s.stats?.totalPnL||0}</td>
-                      <td className="p-4 text-gray-300">{s.stats?.tradesCount||0}</td>
-                      <td className="p-4 text-right"><button onClick={() => handleStudentSelect(s)} className="px-3 py-1.5 bg-gray-700 hover:bg-trade-accent rounded-lg text-xs font-bold">Manage</button></td>
+                    <tr key={s.id} className="hover:bg-gray-700/30 transition-colors">
+                      <td className="p-4">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${s.tier === 'elite' ? 'bg-purple-600/30' : 'bg-gray-700/50'}`}>{s.name?.charAt(0) || '?'}</div>
+                          <div>
+                            <div className="font-bold text-white">{s.name || 'Unknown'}</div>
+                            <div className="text-xs text-gray-400">{s.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span className={`text-xs font-bold uppercase px-3 py-1 rounded ${s.status === 'active' ? 'bg-green-500/20 text-green-400' : s.status === 'at-risk' ? 'bg-red-500/20 text-red-400' : 'bg-gray-700/50 text-gray-400'}`}>{s.status}</span>
+                      </td>
+                      <td className="p-4 capitalize text-gray-200">{s.tier}</td>
+                      <td className={`p-4 font-bold ${(s.stats?.winRate || 0) >= 50 ? 'text-green-400' : 'text-red-400'}`}>{s.stats?.winRate || 0}%</td>
+                      <td className={`p-4 font-bold ${(s.stats?.totalPnL || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>${s.stats?.totalPnL || 0}</td>
+                      <td className="p-4 text-gray-200">{s.stats?.tradesCount || 0}</td>
+                      <td className="p-4 text-right">
+                        <button onClick={() => handleStudentSelect(s)} className="px-4 py-2 bg-trade-neon text-black rounded-xl font-bold hover:bg-green-400 transition-colors">Manage</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -622,45 +921,111 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
           )}
         </div>
       )}
+      {/* Add more tabs similarly, enhancing with better styling, gradients, animations, etc. */}
 
       {/* TRADES TAB */}
       {activeTab === 'trades' && (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="bg-trade-dark rounded-xl border border-gray-700 p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex items-center gap-2 text-lg font-bold"><BookOpen className="h-5 w-5 text-trade-accent" /> Global Ledger</div>
-            <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-              <div className="relative w-full md:w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" /><input type="text" placeholder="Search..." className="w-full bg-gray-800 border border-gray-600 rounded-lg pl-9 pr-4 py-2 text-sm outline-none" value={journalSearch} onChange={e => setJournalSearch(e.target.value)} /></div>
-              <div className="flex gap-2">
-                <select className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 outline-none" value={filterPair} onChange={e => setFilterPair(e.target.value)}><option value="all">All Pairs</option>{uniquePairs.map(p => <option key={p} value={p}>{p}</option>)}</select>
-                <select className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 outline-none" value={filterOutcome} onChange={e => setFilterOutcome(e.target.value)}><option value="all">All</option><option value="win">Wins</option><option value="loss">Losses</option><option value="breakeven">BE</option></select>
+        <div className="space-y-8 animate-slide-up">
+          <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6 flex flex-col md:flex-row gap-4 items-center justify-between shadow-xl">
+            <div className="flex items-center gap-3 text-xl font-bold text-gray-200"><Layers className="h-6 w-6 text-trade-neon" /> Global Trade Ledger</div>
+            <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+              <div className="relative w-full md:w-72">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input type="text" placeholder="Search by pair or student..." className="w-full bg-gray-900/50 border border-gray-600/50 rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:border-trade-neon" value={journalSearch} onChange={e => setJournalSearch(e.target.value)} />
+              </div>
+              <div className="flex gap-4">
+                <select className="bg-gray-900/50 border border-gray-600/50 rounded-xl px-4 py-3 text-sm text-gray-300 outline-none focus:border-trade-neon" value={filterPair} onChange={e => setFilterPair(e.target.value)}>
+                  <option value="all">All Pairs</option>
+                  {uniquePairs.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+                <select className="bg-gray-900/50 border border-gray-600/50 rounded-xl px-4 py-3 text-sm text-gray-300 outline-none focus:border-trade-neon" value={filterOutcome} onChange={e => setFilterOutcome(e.target.value)}>
+                  <option value="all">All Outcomes</option>
+                  <option value="win">Wins</option>
+                  <option value="loss">Losses</option>
+                  <option value="breakeven">Breakeven</option>
+                </select>
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-trade-dark p-4 rounded-xl border border-gray-700"><div className="text-xs text-gray-400 mb-1">Trades</div><div className="text-2xl font-bold">{tradeAnalytics.total}</div></div>
-            <div className="bg-trade-dark p-4 rounded-xl border border-gray-700"><div className="text-xs text-gray-400 mb-1">Win Rate</div><div className={`text-2xl font-bold ${tradeAnalytics.winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>{tradeAnalytics.winRate}%</div></div>
-            <div className="bg-trade-dark p-4 rounded-xl border border-gray-700"><div className="text-xs text-gray-400 mb-1">Net P&L</div><div className={`text-2xl font-bold ${tradeAnalytics.netPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>{tradeAnalytics.netPnL >= 0 ? '+' : ''}${tradeAnalytics.netPnL.toLocaleString()}</div></div>
-            <div className="bg-trade-dark p-4 rounded-xl border border-gray-700"><div className="text-xs text-gray-400 mb-1">W/L</div><div className="text-2xl font-bold text-blue-400">{tradeAnalytics.wins}W / {tradeAnalytics.losses}L</div></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 shadow-xl">
+              <div className="text-xs text-gray-400 mb-2">Total Trades</div>
+              <div className="text-3xl font-bold text-white">{tradeAnalytics.total}</div>
+            </div>
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 shadow-xl">
+              <div className="text-xs text-gray-400 mb-2">Win Rate</div>
+              <div className={`text-3xl font-bold ${tradeAnalytics.winRate >= 50 ? 'text-green-400' : 'text-red-400'}`}>{tradeAnalytics.winRate}%</div>
+            </div>
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 shadow-xl">
+              <div className="text-xs text-gray-400 mb-2">Net P&L</div>
+              <div className={`text-3xl font-bold ${tradeAnalytics.netPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>{tradeAnalytics.netPnL >= 0 ? '+' : ''}${tradeAnalytics.netPnL.toLocaleString()}</div>
+            </div>
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 shadow-xl">
+              <div className="text-xs text-gray-400 mb-2">Wins / Losses</div>
+              <div className="text-3xl font-bold text-blue-400">{tradeAnalytics.wins}W / {tradeAnalytics.losses}L</div>
+            </div>
           </div>
-          <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-            <h3 className="font-bold text-lg mb-6">P&L by Asset</h3>
-            <div className="h-64" style={{minHeight: '200px'}}>{tradeAnalytics.pairData.length > 0 ? <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}><BarChart data={tradeAnalytics.pairData}><XAxis dataKey="name" stroke="#64748b" fontSize={12} /><YAxis stroke="#64748b" fontSize={12} /><Tooltip cursor={{fill:'#1e293b'}} contentStyle={{backgroundColor:'#0f172a',border:'1px solid #334155',borderRadius:'8px'}} /><Bar dataKey="value" name="P&L" radius={[4,4,0,0]}>{tradeAnalytics.pairData.map((e,i) => <Cell key={i} fill={e.value >= 0 ? '#10b981' : '#ef4444'} />)}</Bar></BarChart></ResponsiveContainer> : <div className="flex items-center justify-center h-full text-gray-500">No data available</div>}</div>
+          <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 shadow-xl">
+            <h3 className="font-bold text-xl mb-6 text-gray-200">P&L by Asset</h3>
+            <div className="h-72">
+              {tradeAnalytics.pairData.length > 0 ? (
+                <ResponsiveContainer>
+                  <BarChart data={tradeAnalytics.pairData}>
+                    <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
+                    <YAxis stroke="#94a3b8" fontSize={12} />
+                    <Tooltip contentStyle={{backgroundColor: '#1f2937', border: '1px solid #475569', borderRadius: '8px'}} />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                      {tradeAnalytics.pairData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.value >= 0 ? '#10b981' : '#ef4444'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-400">No data available</div>
+              )}
+            </div>
           </div>
-          <div className="bg-trade-dark rounded-xl border border-gray-700 overflow-x-auto">
-            <table className="w-full text-left text-sm min-w-[800px]">
-              <thead className="bg-gray-800 text-gray-400"><tr><th className="p-4">Date</th><th className="p-4">Student</th><th className="p-4">Pair</th><th className="p-4">Type</th><th className="p-4">Notes</th><th className="p-4 text-center">Result</th><th className="p-4 text-right">P&L</th></tr></thead>
-              <tbody className="divide-y divide-gray-700">
-                {filteredTrades.length ? filteredTrades.map((t,i) => (
-                  <tr key={`${t.id}-${i}`} className="hover:bg-gray-800/50">
-                    <td className="p-4 text-gray-400 font-mono text-xs">{new Date(t.date).toLocaleDateString()}</td>
-                    <td className="p-4"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-bold">{t.studentAvatar}</div><div><div className="font-bold text-white">{t.studentName}</div><div className="text-[10px] text-gray-500 uppercase">{t.studentTier}</div></div></div></td>
+          <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 overflow-x-auto shadow-xl">
+            <table className="w-full text-left text-sm min-w-max">
+              <thead className="bg-gray-900/50 text-gray-300 sticky top-0">
+                <tr>
+                  <th className="p-4">Date</th>
+                  <th className="p-4">Student</th>
+                  <th className="p-4">Pair</th>
+                  <th className="p-4">Type</th>
+                  <th className="p-4">Notes</th>
+                  <th className="p-4 text-center">Result</th>
+                  <th className="p-4 text-right">P&L</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700/50">
+                {filteredTrades.map(t => (
+                  <tr key={t.id} className="hover:bg-gray-700/30 transition-colors">
+                    <td className="p-4 text-gray-400 font-mono text-sm">{new Date(t.date).toLocaleDateString()}</td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gray-700/50 flex items-center justify-center text-sm font-bold">{t.studentAvatar}</div>
+                        <div>
+                          <div className="font-bold text-white">{t.studentName}</div>
+                          <div className="text-xs text-gray-400 uppercase">{t.studentTier}</div>
+                        </div>
+                      </div>
+                    </td>
                     <td className="p-4 font-bold text-white">{t.pair}</td>
-                    <td className="p-4"><span className={`flex items-center gap-1 uppercase text-xs font-bold ${t.type === 'buy' ? 'text-green-400' : 'text-red-400'}`}>{t.type === 'buy' ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}{t.type}</span></td>
-                    <td className="p-4 text-gray-400 max-w-xs truncate text-xs">{t.notes}</td>
-                    <td className="p-4 text-center"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${t.status === 'win' ? 'bg-green-500/20 text-green-400' : t.status === 'loss' ? 'bg-red-500/20 text-red-400' : 'bg-gray-700 text-gray-400'}`}>{t.status}</span></td>
-                    <td className={`p-4 text-right font-bold font-mono ${(t.pnl||0) > 0 ? 'text-green-400' : (t.pnl||0) < 0 ? 'text-red-400' : 'text-gray-500'}`}>{t.pnl ? (t.pnl > 0 ? `+${t.pnl}` : `${t.pnl}`) : '-'}</td>
+                    <td className="p-4">
+                      <span className={`flex items-center gap-2 uppercase text-sm font-bold ${t.type === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
+                        {t.type === 'buy' ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />} {t.type}
+                      </span>
+                    </td>
+                    <td className="p-4 text-gray-400 max-w-md truncate text-sm">{t.notes}</td>
+                    <td className="p-4 text-center">
+                      <span className={`px-3 py-1 rounded text-sm font-bold uppercase ${t.status === 'win' ? 'bg-green-500/20 text-green-400' : t.status === 'loss' ? 'bg-red-500/20 text-red-400' : 'bg-gray-700/50 text-gray-400'}`}>{t.status}</span>
+                    </td>
+                    <td className={`p-4 text-right font-bold font-mono ${(t.pnl || 0) > 0 ? 'text-green-400' : (t.pnl || 0) < 0 ? 'text-red-400' : 'text-gray-400'}`}>{t.pnl ? `$${t.pnl.toLocaleString()}` : '-'}</td>
                   </tr>
-                )) : <tr><td colSpan={7} className="p-12 text-center text-gray-500">No trades match filters.</td></tr>}
+                ))}
+                {filteredTrades.length === 0 && <tr><td colSpan={7} className="p-12 text-center text-gray-400">No trades match your filters.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -669,54 +1034,223 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
 
       {/* ANALYTICS TAB */}
       {activeTab === 'analytics' && (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-              <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <Activity className="h-4 w-4 text-trade-neon" /> MRR
-              </div>
-              <div className="text-3xl font-bold text-white">${businessMetrics.mrr.toLocaleString()}</div>
-              <div className={`text-xs mt-1 flex items-center gap-1 ${businessMetrics.growthPercentage >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                <TrendingUp className="h-3 w-3" /> {businessMetrics.growthPercentage >= 0 ? '+' : ''}{businessMetrics.growthPercentage}%
+        <div className="space-y-8 animate-slide-up">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 shadow-xl hover:scale-105 transition-transform">
+              <div className="flex items-center gap-3 text-gray-300 mb-3"><Activity className="h-5 w-5 text-trade-neon" /> MRR</div>
+              <div className="text-3xl font-extrabold text-white">${businessMetrics.mrr.toLocaleString()}</div>
+              <div className={`text-sm mt-2 flex items-center gap-2 ${businessMetrics.growthPercentage >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <TrendingUp className="h-4 w-4" /> {businessMetrics.growthPercentage >= 0 ? '+' : ''}{businessMetrics.growthPercentage}% MoM
               </div>
             </div>
-            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-              <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <Users className="h-4 w-4" /> Subscribers
-              </div>
-              <div className="text-3xl font-bold text-white">{students.length}</div>
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 shadow-xl hover:scale-105 transition-transform">
+              <div className="flex items-center gap-3 text-gray-300 mb-3"><Users className="h-5 w-5 text-blue-400" /> Subscribers</div>
+              <div className="text-3xl font-extrabold text-white">{students.length}</div>
             </div>
-            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-              <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <CreditCard className="h-4 w-4" /> Lifetime Revenue
-              </div>
-              <div className="text-3xl font-bold text-white">${businessMetrics.totalRevenue.toLocaleString()}</div>
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 shadow-xl hover:scale-105 transition-transform">
+              <div className="flex items-center gap-3 text-gray-300 mb-3"><CreditCard className="h-5 w-5 text-purple-400" /> Lifetime Revenue</div>
+              <div className="text-3xl font-extrabold text-white">${businessMetrics.totalRevenue.toLocaleString()}</div>
             </div>
-            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-              <div className="flex items-center gap-2 text-gray-400 mb-2">
-                <ArrowDownRight className="h-4 w-4 text-red-500" /> Churn
-              </div>
-              <div className="text-3xl font-bold text-red-400">{businessMetrics.churnRate.toFixed(1)}%</div>
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 shadow-xl hover:scale-105 transition-transform">
+              <div className="flex items-center gap-3 text-gray-300 mb-3"><AlertTriangle className="h-5 w-5 text-red-400" /> Churn Rate</div>
+              <div className="text-3xl font-extrabold text-red-400">{businessMetrics.churnRate}%</div>
             </div>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 bg-trade-dark p-6 rounded-xl border border-gray-700">
-              <h3 className="font-bold text-lg mb-6">Revenue Trajectory</h3>
-              <div className="h-64" style={{minHeight: '200px'}}>{businessMetrics.revenueGrowthData.length ? <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}><AreaChart data={businessMetrics.revenueGrowthData}><defs><linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#00ff94" stopOpacity={0.3}/><stop offset="95%" stopColor="#00ff94" stopOpacity={0}/></linearGradient></defs><XAxis dataKey="month" stroke="#64748b" fontSize={12} /><YAxis stroke="#64748b" fontSize={12} /><CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} /><Tooltip contentStyle={{backgroundColor:'#0f172a',border:'1px solid #334155',borderRadius:'8px'}} /><Area type="monotone" dataKey="revenue" stroke="#00ff94" fillOpacity={1} fill="url(#colorRev)" /></AreaChart></ResponsiveContainer> : <div className="flex items-center justify-center h-full text-gray-500">No data</div>}</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 shadow-xl">
+              <h3 className="font-bold text-xl mb-6 text-gray-200">Revenue Growth</h3>
+              <div className="h-72">
+                {businessMetrics.revenueGrowthData.length > 0 ? (
+                  <ResponsiveContainer>
+                    <AreaChart data={businessMetrics.revenueGrowthData}>
+                      <defs>
+                        <linearGradient id="revGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="month" stroke="#94a3b8" fontSize={12} />
+                      <YAxis stroke="#94a3b8" fontSize={12} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#475569" opacity={0.5} />
+                      <Tooltip contentStyle={{backgroundColor: '#1f2937', border: '1px solid #475569', borderRadius: '8px'}} />
+                      <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="url(#revGradient)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">No revenue data</div>
+                )}
+              </div>
             </div>
-            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-              <h3 className="font-bold text-lg mb-6">Student Tiers</h3>
-              <div className="h-64" style={{minHeight: '200px'}}>{businessMetrics.tierData.length ? <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}><PieChart><Pie data={businessMetrics.tierData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">{businessMetrics.tierData.map((e,i) => <Cell key={i} fill={e.color} stroke="none" />)}</Pie><Tooltip contentStyle={{backgroundColor:'#0f172a',border:'1px solid #334155',borderRadius:'8px'}} /><Legend verticalAlign="bottom" height={36} /></PieChart></ResponsiveContainer> : <div className="flex items-center justify-center h-full text-gray-500">No data</div>}</div>
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 shadow-xl">
+              <h3 className="font-bold text-xl mb-6 text-gray-200">Course Completion Rates</h3>
+              <div className="h-72">
+                {businessMetrics.courseCompletionData.length > 0 ? (
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie data={businessMetrics.courseCompletionData} dataKey="completion" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={100} fill="#3b82f6" label={({ name, value }) => `${name}: ${value}%`} />
+                      <Tooltip contentStyle={{backgroundColor: '#1f2937', border: '1px solid #475569', borderRadius: '8px'}} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">No completion data</div>
+                )}
+              </div>
             </div>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-              <h3 className="font-bold text-lg mb-6">Course Completion</h3>
-              <div className="h-64" style={{minHeight: '200px'}}>{businessMetrics.courseCompletionData.length ? <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}><BarChart layout="vertical" data={businessMetrics.courseCompletionData}><XAxis type="number" stroke="#64748b" fontSize={12} /><YAxis dataKey="name" type="category" width={120} stroke="#64748b" fontSize={11} /><Tooltip cursor={{fill:'#1e293b'}} contentStyle={{backgroundColor:'#0f172a',border:'1px solid #334155',borderRadius:'8px'}} /><Bar dataKey="completion" fill="#3b82f6" radius={[0,4,4,0]} barSize={20} name="% Complete" /></BarChart></ResponsiveContainer> : <div className="flex items-center justify-center h-full text-gray-500">No data</div>}</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 shadow-xl">
+              <h3 className="font-bold text-xl mb-6 text-gray-200">Tier Distribution</h3>
+              <div className="h-72">
+                {businessMetrics.tierData.length > 0 ? (
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie data={businessMetrics.tierData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} label={({ name, value }) => `${name}: ${value}`}>
+                        {businessMetrics.tierData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{backgroundColor: '#1f2937', border: '1px solid #475569', borderRadius: '8px'}} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">No tier data</div>
+                )}
+              </div>
             </div>
-            <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-              <h3 className="font-bold text-lg mb-6 flex items-center gap-2"><ShieldAlert className="h-5 w-5 text-red-400" /> Rule Violations</h3>
-              <div className="h-64" style={{minHeight: '200px'}}>{businessMetrics.violationData.length ? <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}><BarChart data={businessMetrics.violationData}><XAxis dataKey="rule" stroke="#64748b" fontSize={10} /><YAxis stroke="#64748b" fontSize={12} /><Tooltip cursor={{fill:'#1e293b'}} contentStyle={{backgroundColor:'#0f172a',border:'1px solid #334155',borderRadius:'8px'}} /><Bar dataKey="count" fill="#ef4444" radius={[4,4,0,0]} name="Violations" /></BarChart></ResponsiveContainer> : <div className="flex items-center justify-center h-full text-gray-500">No data</div>}</div>
+            <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 shadow-xl">
+              <h3 className="font-bold text-xl mb-6 text-gray-200">Rule Violations</h3>
+              <div className="h-72">
+                {businessMetrics.violationData.length > 0 ? (
+                  <ResponsiveContainer>
+                    <BarChart data={businessMetrics.violationData}>
+                      <XAxis dataKey="rule" stroke="#94a3b8" fontSize={12} />
+                      <YAxis stroke="#94a3b8" fontSize={12} />
+                      <Tooltip contentStyle={{backgroundColor: '#1f2937', border: '1px solid #475569', borderRadius: '8px'}} />
+                      <Bar dataKey="count" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">No violation data</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* APPLICATIONS TAB */}
+      {activeTab === 'applications' && (
+        <div className="space-y-8 animate-slide-up">
+          <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6 shadow-xl">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-3 text-gray-200">
+                <FileText className="h-6 w-6 text-trade-neon" /> Pending Applications
+              </h2>
+              <button 
+                onClick={() => {
+                  const fetchPending = async () => {
+                    try {
+                      console.log('Manually refreshing pending applications...');
+                      const apps = await fetchPendingApplications();
+                      console.log('Pending applications fetched:', apps);
+                      setPendingApplications(apps || []);
+                    } catch (err) {
+                      console.error('Error fetching pending applications:', err);
+                    }
+                  };
+                  fetchPending();
+                }}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold flex items-center gap-2 transition-colors"
+              >
+                <RefreshCw className="h-4 w-4" /> Refresh
+              </button>
+            </div>
+            {pendingApplications.length === 0 ? (
+              <div className="text-center py-16">
+                <Clock className="h-16 w-16 mx-auto text-gray-500 mb-4" />
+                <h3 className="text-2xl font-bold text-gray-300 mb-2">No Pending Applications</h3>
+                <p className="text-gray-400">All applications are processed. Check back later.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm min-w-max">
+                  <thead className="bg-gray-900/50 text-gray-300">
+                    <tr>
+                      <th className="p-4">Applicant</th>
+                      <th className="p-4">Email</th>
+                      <th className="p-4">Application Date</th>
+                      <th className="p-4">Requested Tier</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700/50">
+                    {pendingApplications.map(application => (
+                      <tr key={application.id} className="hover:bg-gray-700/30 transition-colors">
+                        <td className="p-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-gray-700/50 flex items-center justify-center text-sm font-bold">{application.name?.charAt(0) || '?'}</div>
+                            <div className="font-bold text-white">{application.name || 'Unknown'}</div>
+                          </div>
+                        </td>
+                        <td className="p-4 text-gray-300">{application.email}</td>
+                        <td className="p-4 text-gray-400 font-mono text-sm">{new Date(application.joinedDate).toLocaleDateString()}</td>
+                        <td className="p-4">
+                          <span className={`px-3 py-1 rounded text-sm font-bold uppercase ${
+                            application.tier === 'elite-pending' ? 'bg-purple-500/20 text-purple-400' :
+                            application.tier === 'professional-pending' ? 'bg-blue-500/20 text-blue-400' :
+                            application.tier === 'foundation-pending' ? 'bg-green-500/20 text-green-400' :
+                            'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {application.tier.replace('-pending', '').charAt(0).toUpperCase() + application.tier.replace('-pending', '').slice(1)}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right">
+                          <div className="flex justify-end gap-3">
+                            <button 
+                              onClick={() => {
+                                // Approve to the corresponding tier
+                                const approvedTier = application.tier.replace('-pending', '');
+                                handleApproveApplication(application.id, approvedTier);
+                              }} 
+                              className="px-4 py-2 bg-green-500/30 hover:bg-green-500/50 text-green-300 rounded-xl font-bold flex items-center gap-2 transition-colors"
+                            >
+                              <CheckCircle className="h-4 w-4" /> Approve
+                            </button>
+                            <button 
+                              onClick={() => {
+                                // Reject to free tier
+                                handleRejectApplication(application.id, 'free');
+                              }} 
+                              className="px-4 py-2 bg-red-500/30 hover:bg-red-500/50 text-red-300 rounded-xl font-bold flex items-center gap-2 transition-colors"
+                            >
+                              <XCircle className="h-4 w-4" /> Reject
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6 shadow-xl">
+            <h3 className="text-xl font-bold mb-6 text-gray-200">Application Review Workflow</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-6 bg-gray-900/50 rounded-2xl border border-gray-700/50">
+                <div className="text-trade-neon font-bold text-lg mb-3">1. Review Details</div>
+                <p className="text-sm text-gray-300">Evaluate applicant's profile, trading history, and motivation.</p>
+              </div>
+              <div className="p-6 bg-gray-900/50 rounded-2xl border border-gray-700/50">
+                <div className="text-trade-neon font-bold text-lg mb-3">2. Decide Action</div>
+                <p className="text-sm text-gray-300">Approve for requested tier access or reject to Free tier.</p>
+              </div>
+              <div className="p-6 bg-gray-900/50 rounded-2xl border border-gray-700/50">
+                <div className="text-trade-neon font-bold text-lg mb-3">3. Notify User</div>
+                <p className="text-sm text-gray-300">Automated notification sent upon decision.</p>
+              </div>
             </div>
           </div>
         </div>
@@ -724,293 +1258,209 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
 
       {/* CONTENT TAB */}
       {activeTab === 'content' && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <CourseManagementSystem currentUser={{ id: '00000000-0000-0000-0000-000000000000', name: 'Admin', email: 'admin@example.com', tier: 'elite', joinedDate: new Date().toISOString(), stats: { winRate: 0, totalPnL: 0, tradesCount: 0, avgRiskReward: 0, currentDrawdown: 0 }, recentTrades: [], status: 'active' }} isAdmin={true} />
-        </div>
-      )}
+            <CourseManagementSystem
+              currentUser={{
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                tier: user.subscriptionTier || 'foundation',
+                joinedDate: new Date().toISOString(),
+                stats: {
+                  winRate: 0,
+                  totalPnL: 0,
+                  tradesCount: 0,
+                  avgRiskReward: 0,
+                  currentDrawdown: 0
+                },
+                recentTrades: [],
+                status: 'active'
+              }}
+              isAdmin={true}
+            />
+          )}
 
       {/* RULES TAB */}
       {activeTab === 'rules' && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="h-full">
           <RuleBuilder 
-            userId="00000000-0000-0000-0000-000000000000" 
+            userId={user.id}
             rules={tradeRules} 
             onRulesChange={setTradeRulesMemo} 
           />
         </div>
       )}
 
-      {/* ADMIN TRADE JOURNAL TAB */}
-      {activeTab === 'journal' && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <AdminTradeJournal />
+      {/* JOURNAL TAB */}
+      {activeTab === 'journal' && <AdminTradeJournal />}
+
+      {/* ADMIN ANALYTICS TAB */}
+      {activeTab === 'admin-analytics' && (
+        <div className="space-y-8 animate-slide-up">
+          <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 p-6 shadow-xl">
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-gray-200"><BarChart3 className="h-6 w-6 text-trade-neon" /> Personal Trade Analytics</h2>
+            {adminAnalyticsLoading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-trade-neon"></div>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="bg-gray-900/50 p-6 rounded-2xl border border-gray-700/50">
+                    <div className="flex items-center gap-3 text-gray-300 mb-3"><DollarSign className="h-5 w-5 text-green-400" /> Total P&L</div>
+                    <div className={`text-3xl font-extrabold ${adminStats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>{adminStats.totalPnL >= 0 ? '+' : ''}${adminStats.totalPnL.toFixed(2)}</div>
+                  </div>
+                  <div className="bg-gray-900/50 p-6 rounded-2xl border border-gray-700/50">
+                    <div className="flex items-center gap-3 text-gray-300 mb-3"><TrendingUp className="h-5 w-5 text-blue-400" /> Win Rate</div>
+                    <div className="text-3xl font-extrabold text-blue-400">{adminStats.winRate}%</div>
+                  </div>
+                  <div className="bg-gray-900/50 p-6 rounded-2xl border border-gray-700/50">
+                    <div className="flex items-center gap-3 text-gray-300 mb-3"><BarChart2 className="h-5 w-5 text-purple-400" /> Total Trades</div>
+                    <div className="text-3xl font-extrabold text-purple-400">{adminStats.totalTrades}</div>
+                  </div>
+                  <div className="bg-gray-900/50 p-6 rounded-2xl border border-gray-700/50">
+                    <div className="flex items-center gap-3 text-gray-300 mb-3"><ArrowUpRight className="h-5 w-5 text-yellow-400" /> Best Asset</div>
+                    <div className="text-3xl font-extrabold text-yellow-400">{adminStats.bestAsset}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                  <div className="bg-gray-900/50 p-6 rounded-2xl border border-gray-700/50">
+                    <div className="flex items-center gap-3 text-gray-300 mb-3"><ArrowUpRight className="h-5 w-5 text-green-400" /> Largest Win</div>
+                    <div className="text-3xl font-extrabold text-green-400">${adminStats.largestWin.toLocaleString()}</div>
+                  </div>
+                  <div className="bg-gray-900/50 p-6 rounded-2xl border border-gray-700/50">
+                    <div className="flex items-center gap-3 text-gray-300 mb-3"><ArrowDownRight className="h-5 w-5 text-red-400" /> Largest Loss</div>
+                    <div className="text-3xl font-extrabold text-red-400">${adminStats.largestLoss.toLocaleString()}</div>
+                  </div>
+                  <div className="bg-gray-900/50 p-6 rounded-2xl border border-gray-700/50">
+                    <div className="flex items-center gap-3 text-gray-300 mb-3"><BarChart2 className="h-5 w-5 text-blue-400" /> Profit Factor</div>
+                    <div className="text-3xl font-extrabold text-blue-400">{adminStats.profitFactor.toFixed(2)}</div>
+                  </div>
+                </div>
+                <div className="mt-8 bg-gray-900/50 p-6 rounded-2xl border border-gray-700/50">
+                  <h3 className="font-bold text-xl mb-6 text-gray-200">P&L Over Time</h3>
+                  <div className="h-72">
+                    {pnlOverTimeData.length > 0 ? (
+                      <ResponsiveContainer>
+                        <AreaChart data={pnlOverTimeData}>
+                          <defs>
+                            <linearGradient id="pnlGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={adminStats.totalPnL >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0.8} />
+                              <stop offset="95%" stopColor={adminStats.totalPnL >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
+                          <YAxis stroke="#94a3b8" fontSize={12} />
+                          <CartesianGrid strokeDasharray="3 3" stroke="#475569" opacity={0.5} />
+                          <Tooltip contentStyle={{backgroundColor: '#1f2937', border: '1px solid #475569', borderRadius: '8px'}} />
+                          <Area type="monotone" dataKey="cumulativePnL" stroke={adminStats.totalPnL >= 0 ? '#10b981' : '#ef4444'} fill="url(#pnlGradient)" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-400">No trade data available</div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-8 bg-gray-900/50 p-6 rounded-2xl border border-gray-700/50">
+                  <h3 className="font-bold text-xl mb-6 text-gray-200">Asset Performance</h3>
+                  <div className="h-72">
+                    {Object.keys(adminStats.pairStats).length > 0 ? (
+                      <ResponsiveContainer>
+                        <BarChart data={Object.entries(adminStats.pairStats).map(([name, value]) => ({ name, pnl: (value as { pnl: number }).pnl }))}>
+                          <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} />
+                          <YAxis stroke="#94a3b8" fontSize={12} />
+                          <Tooltip contentStyle={{backgroundColor: '#1f2937', border: '1px solid #475569', borderRadius: '8px'}} />
+                          <Bar dataKey="pnl" radius={[4, 4, 0, 0]}>
+                            {Object.entries(adminStats.pairStats).map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={(entry[1] as { pnl: number }).pnl >= 0 ? '#10b981' : '#ef4444'} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-400">No trade data available</div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
       {/* SETTINGS TAB */}
       {activeTab === 'settings' && (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* Community Links */}
+        <div className="space-y-8 animate-slide-up">
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Community Links</h2>
-              <button onClick={() => setShowCommunityLinkForm(true)} className="flex items-center gap-2 px-4 py-2 bg-trade-neon text-black font-bold rounded-lg hover:bg-green-400"><Plus className="h-4 w-4" /> Add Link</button>
+              <h2 className="text-2xl font-bold text-gray-200">Community Links Management</h2>
+              <button onClick={() => setShowLinkForm(true)} className="flex items-center gap-2 px-5 py-3 bg-trade-neon text-black font-bold rounded-xl hover:bg-green-400 transition-colors"><Plus className="h-5 w-5" /> New Link</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {communityLinks.map(link => (
-                <div key={link.id} className="bg-trade-dark border border-gray-700 rounded-xl p-6">
+                <div key={link.id} className="bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6 shadow-xl">
                   <div className="flex justify-between items-start mb-4">
-                    <div><h3 className="text-xl font-bold flex items-center gap-2"><div className="w-4 h-4 rounded-full" style={{backgroundColor: link.iconColor}}></div>{link.platformName}</h3><p className="text-gray-400 text-sm truncate max-w-[200px]">{link.linkUrl}</p></div>
-                    <div className="flex gap-2">
-                      <button onClick={() => setEditingCommunityLink(link)} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg"><Edit2 className="h-4 w-4" /></button>
-                      <button onClick={() => handleDeleteCommunityLink(link.id)} className="p-2 bg-red-900/50 hover:bg-red-900/70 rounded-lg"><Trash2 className="h-4 w-4" /></button>
+                    <div>
+                      <h3 className="text-xl font-bold text-white flex items-center gap-3"><div className="w-6 h-6 rounded-full" style={{backgroundColor: link.iconColor}}></div>{link.platformName}</h3>
+                      <p className="text-gray-300 text-sm truncate max-w-xs">{link.linkUrl}</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={() => setEditingLink(link)} className="p-3 bg-gray-700/50 hover:bg-gray-600/50 rounded-xl transition-colors"><Edit2 className="h-5 w-5 text-blue-400" /></button>
+                      <button onClick={() => handleDeleteCommunityLink(link.id)} className="p-3 bg-red-900/30 hover:bg-red-900/50 rounded-xl transition-colors"><Trash2 className="h-5 w-5 text-red-400" /></button>
                     </div>
                   </div>
-                  <p className="text-gray-300 mb-4 text-sm line-clamp-2">{link.description}</p>
+                  <p className="text-gray-300 mb-4 text-sm line-clamp-3">{link.description}</p>
                   <div className="flex items-center justify-between">
-                    <span className={`text-sm px-2 py-1 rounded-full ${link.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{link.isActive ? 'Active' : 'Inactive'}</span>
-                    <span className="text-sm text-gray-500">Order: {link.sortOrder}</span>
+                    <span className={`text-sm px-3 py-1 rounded-full ${link.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{link.isActive ? 'Active' : 'Inactive'}</span>
+                    <span className="text-sm text-gray-400">Order: {link.sortOrder}</span>
                   </div>
                 </div>
               ))}
-              {!communityLinks.length && <div className="col-span-full text-center py-12 bg-trade-dark border border-gray-700 border-dashed rounded-xl"><p className="text-gray-500">No community links yet.</p></div>}
+              {!communityLinks.length && <div className="col-span-full text-center py-16 bg-gray-800/50 border border-gray-700/50 border-dashed rounded-2xl"><p className="text-gray-400 text-lg">No community links created yet.</p></div>}
             </div>
           </div>
-          {/* Subscription Plans */}
-          <div className="space-y-6 pt-8 border-t border-gray-700">
+          <div className="space-y-6 pt-8 border-t border-gray-700/50">
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Subscription Plans</h2>
-              <button onClick={() => setShowPlanForm(true)} className="flex items-center gap-2 px-4 py-2 bg-trade-neon text-black font-bold rounded-lg hover:bg-green-400"><Plus className="h-4 w-4" /> Add Plan</button>
+              <h2 className="text-2xl font-bold text-gray-200">Subscription Plans Management</h2>
+              <button onClick={() => setShowPlanForm(true)} className="flex items-center gap-2 px-5 py-3 bg-trade-neon text-black font-bold rounded-xl hover:bg-green-400 transition-colors"><Plus className="h-5 w-5" /> New Plan</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {plans.map(plan => (
-                <div key={plan.id} className="bg-trade-dark border border-gray-700 rounded-xl p-6">
+                <div key={plan.id} className="bg-gray-800/50 border border-gray-700/50 rounded-2xl p-6 shadow-xl">
                   <div className="flex justify-between items-start mb-4">
-                    <div><h3 className="text-xl font-bold">{plan.name}</h3><p className="text-gray-400 text-sm">${plan.price} ({plan.interval})</p></div>
-                    <div className="flex gap-2">
-                      <button onClick={() => setEditingPlan(plan)} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg"><Edit2 className="h-4 w-4" /></button>
-                      <button onClick={() => handleDeletePlan(plan.id)} className="p-2 bg-red-900/50 hover:bg-red-900/70 rounded-lg"><Trash2 className="h-4 w-4" /></button>
+                    <div>
+                      <h3 className="text-xl font-bold text-white">{plan.name}</h3>
+                      <p className="text-gray-300 text-sm">${plan.price} / {plan.interval}</p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button onClick={() => setEditingPlan(plan)} className="p-3 bg-gray-700/50 hover:bg-gray-600/50 rounded-xl transition-colors"><Edit2 className="h-5 w-5 text-blue-400" /></button>
+                      <button onClick={() => handleDeletePlan(plan.id)} className="p-3 bg-red-900/30 hover:bg-red-900/50 rounded-xl transition-colors"><Trash2 className="h-5 w-5 text-red-400" /></button>
                     </div>
                   </div>
-                  <p className="text-gray-300 mb-4 text-sm line-clamp-2">{plan.description}</p>
-                  {plan.features?.length > 0 && <ul className="text-xs text-gray-400 mb-4 space-y-1">{plan.features.slice(0,3).map((f,i) => <li key={i} className="flex items-center gap-2"><span className="text-trade-neon">✓</span>{f}</li>)}{plan.features.length > 3 && <li className="text-gray-500">+{plan.features.length - 3} more</li>}</ul>}
+                  <p className="text-gray-300 mb-4 text-sm line-clamp-3">{plan.description}</p>
+                  {plan.features?.length > 0 && (
+                    <ul className="text-sm text-gray-300 mb-4 space-y-2">
+                      {plan.features.slice(0, 3).map((f, i) => (
+                        <li key={i} className="flex items-center gap-2"><span className="text-trade-neon">✓</span>{f}</li>
+                      ))}
+                      {plan.features.length > 3 && <li className="text-gray-400">+ {plan.features.length - 3} more features</li>}
+                    </ul>
+                  )}
                   <div className="flex items-center justify-between">
-                    <span className={`text-sm px-2 py-1 rounded-full ${plan.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{plan.isActive ? 'Active' : 'Inactive'}</span>
-                    <span className="text-sm text-gray-500">Order: {plan.sortOrder}</span>
+                    <span className={`text-sm px-3 py-1 rounded-full ${plan.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{plan.isActive ? 'Active' : 'Inactive'}</span>
+                    <span className="text-sm text-gray-400">Order: {plan.sortOrder}</span>
                   </div>
                 </div>
               ))}
-              {!plans.length && <div className="col-span-full text-center py-12 bg-trade-dark border border-gray-700 border-dashed rounded-xl"><p className="text-gray-500">No plans yet.</p></div>}
+              {!plans.length && <div className="col-span-full text-center py-16 bg-gray-800/50 border border-gray-700/50 border-dashed rounded-2xl"><p className="text-gray-400 text-lg">No subscription plans created yet.</p></div>}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ADMIN ANALYTICS TAB */}
-      {activeTab === 'admin-analytics' && (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex items-center gap-2 text-2xl font-bold mb-6">
-            <BarChart3 className="h-8 w-8 text-trade-neon" /> Admin Trade Analytics
-          </div>
-          
-          {adminAnalyticsLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="flex flex-col items-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-trade-neon"></div>
-                <p className="mt-4 text-gray-400">Loading analytics...</p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-                  <div className="flex items-center gap-2 text-gray-400 mb-2">
-                    <DollarSign className="h-5 w-5" /> My Total P&L
-                  </div>
-                  <div className={`text-3xl font-bold ${adminStats.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {adminStats.totalPnL >= 0 ? '+' : ''}${adminStats.totalPnL.toFixed(2)}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">All time performance</div>
-                </div>
-                
-                <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-                  <div className="flex items-center gap-2 text-gray-400 mb-2">
-                    <TrendingUp className="h-5 w-5" /> Win Rate
-                  </div>
-                  <div className="text-3xl font-bold text-blue-400">{adminStats.winRate}%</div>
-                  <div className="text-xs text-gray-500 mt-1">Based on closed trades</div>
-                </div>
-                
-                <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-                  <div className="flex items-center gap-2 text-gray-400 mb-2">
-                    <BarChart2 className="h-5 w-5" /> Total Trades
-                  </div>
-                  <div className="text-3xl font-bold text-purple-400">{adminStats.totalTrades}</div>
-                  <div className="text-xs text-gray-500 mt-1">Closed positions</div>
-                </div>
-                
-                <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-                  <div className="flex items-center gap-2 text-gray-400 mb-2">
-                    <ArrowUpRight className="h-5 w-5" /> Best Asset
-                  </div>
-                  <div className="text-3xl font-bold text-yellow-400">{adminStats.bestAsset}</div>
-                  <div className="text-xs text-gray-500 mt-1">Highest P&L pair</div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-                  <h3 className="font-bold text-lg mb-6">P&L Over Time</h3>
-                  <div className="h-64">
-                    {pnlOverTimeData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={pnlOverTimeData}>
-                          <defs>
-                            <linearGradient id="colorPnL" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor={adminStats.totalPnL >= 0 ? "#10b981" : "#ef4444"} stopOpacity={0.8}/>
-                              <stop offset="95%" stopColor={adminStats.totalPnL >= 0 ? "#10b981" : "#ef4444"} stopOpacity={0.1}/>
-                            </linearGradient>
-                          </defs>
-                          <XAxis 
-                            dataKey="date" 
-                            stroke="#64748b" 
-                            fontSize={12}
-                            tickFormatter={(value) => {
-                              const date = new Date(value);
-                              return `${date.getMonth() + 1}/${date.getDate()}`;
-                            }}
-                          />
-                          <YAxis 
-                            stroke="#64748b" 
-                            fontSize={12}
-                            tickFormatter={(value) => `$${value}`}
-                          />
-                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
-                          <Tooltip 
-                            contentStyle={{backgroundColor:'#0f172a',border:'1px solid #334155',borderRadius:'8px'}}
-                            formatter={(value) => [`$${Number(value).toFixed(2)}`, 'P&L']}
-                            labelFormatter={(label) => `Date: ${label}`}
-                          />
-                          <Area 
-                            type="monotone" 
-                            dataKey="cumulativePnL" 
-                            stroke={adminStats.totalPnL >= 0 ? "#10b981" : "#ef4444"} 
-                            fillOpacity={1} 
-                            fill="url(#colorPnL)" 
-                            name="Cumulative P&L"
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-gray-500">
-                        No trade data available
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-                  <h3 className="font-bold text-lg mb-6">Performance by Asset</h3>
-                  <div className="h-64 bg-gray-900/50 rounded-lg overflow-y-auto">
-                    {Object.keys(adminStats.pairStats).length > 0 ? (
-                      <div className="space-y-3">
-                        {Object.entries(adminStats.pairStats)
-                          .sort(([, a], [, b]) => (b as { wins: number; losses: number; pnl: number }).pnl - (a as { wins: number; losses: number; pnl: number }).pnl)
-                          .map(([pair, stats]) => (
-                            <div key={pair} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-                              <div>
-                                <div className="font-medium text-white">{pair}</div>
-                                <div className="text-xs text-gray-400">{(stats as { wins: number; losses: number; pnl: number }).wins}W / {(stats as { wins: number; losses: number; pnl: number }).losses}L</div>
-                              </div>
-                              <div className={`font-bold ${(stats as { wins: number; losses: number; pnl: number }).pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                ${(stats as { wins: number; losses: number; pnl: number }).pnl.toFixed(2)}
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-gray-500">
-                        No trade data available
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-trade-dark p-6 rounded-xl border border-gray-700">
-                <h3 className="font-bold text-lg mb-6">Recent Trades</h3>
-                <div className="bg-gray-900/50 rounded-lg overflow-hidden">
-                  {adminTrades.length > 0 ? (
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-gray-800 text-gray-400">
-                        <tr>
-                          <th className="p-4">Date</th>
-                          <th className="p-4">Pair</th>
-                          <th className="p-4">Type</th>
-                          <th className="p-4 text-right">P&L</th>
-                          <th className="p-4 text-center">Result</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-700">
-                        {adminTrades.slice(0, 10).map((trade) => (
-                          <tr key={trade.id} className="hover:bg-gray-800/50">
-                            <td className="p-4 text-gray-400">
-                              {new Date(trade.date).toLocaleDateString()}
-                            </td>
-                            <td className="p-4 font-bold">{trade.pair}</td>
-                            <td className="p-4">
-                              <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                                trade.type === 'buy' 
-                                  ? 'bg-green-500/20 text-green-400' 
-                                  : 'bg-red-500/20 text-red-400'
-                              }`}>
-                                {trade.type}
-                              </span>
-                            </td>
-                            <td className={`p-4 text-right font-bold ${
-                              (trade.pnl || 0) > 0 
-                                ? 'text-green-400' 
-                                : (trade.pnl || 0) < 0 
-                                  ? 'text-red-400' 
-                                  : 'text-gray-500'
-                            }`}>
-                              {trade.pnl !== undefined 
-                                ? (trade.pnl > 0 ? `+$${trade.pnl.toFixed(2)}` : `$${trade.pnl.toFixed(2)}`) 
-                                : '-'}
-                            </td>
-                            <td className="p-4 text-center">
-                              <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                                trade.status === 'win' 
-                                  ? 'bg-green-500/20 text-green-400' 
-                                  : trade.status === 'loss' 
-                                    ? 'bg-red-500/20 text-red-400' 
-                                    : trade.status === 'breakeven' 
-                                      ? 'bg-yellow-500/20 text-yellow-400' 
-                                      : 'bg-gray-500/20 text-gray-400'
-                              }`}>
-                                {trade.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div className="p-8 text-center text-gray-500">
-                      No trades recorded yet. Start by adding your first trade in the "My Trades" section.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
         </div>
       )}
 
       {/* MODALS */}
       {selectedStudent && <StudentDetailModal student={selectedStudent} onClose={() => setSelectedStudent(null)} />}
-      {showCommunityLinkForm && <CommunityLinkForm onSubmit={handleCreateCommunityLink} onCancel={() => setShowCommunityLinkForm(false)} />}
-      {editingCommunityLink && <CommunityLinkForm link={editingCommunityLink} onSubmit={u => handleUpdateCommunityLink(editingCommunityLink.id, u)} onCancel={() => setEditingCommunityLink(null)} />}
+      {showLinkForm && <CommunityLinkForm onSubmit={handleCreateCommunityLink} onCancel={() => setShowLinkForm(false)} />}
+      {editingLink && <CommunityLinkForm link={editingLink} onSubmit={u => handleUpdateCommunityLink(editingLink.id, u)} onCancel={() => setEditingLink(null)} />}
       {showPlanForm && <PlanForm onSubmit={handleCreatePlan} onCancel={() => setShowPlanForm(false)} />}
       {editingPlan && <PlanForm plan={editingPlan} onSubmit={u => handleUpdatePlan(editingPlan.id, u)} onCancel={() => setEditingPlan(null)} />}
     </div>

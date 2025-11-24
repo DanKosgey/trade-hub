@@ -3,16 +3,21 @@ import { motion } from 'framer-motion';
 import { MentorshipApplication } from '../types';
 import { CheckCircle, ArrowLeft, Send, AlertCircle, ShieldCheck, Wallet, TrendingUp, Brain, User, Mail, Hash, DollarSign, Award, Target, Clock } from 'lucide-react';
 
+// Extend the existing interface
+interface ExtendedMentorshipApplication extends MentorshipApplication {
+  subscriptionTier?: string;
+}
+
 interface EliteApplicationFormProps {
   selectedPlan?: string | null;
-  onSubmit: (data: MentorshipApplication) => void;
+  onSubmit: (data: ExtendedMentorshipApplication) => void;
   onCancel: () => void;
 }
 
 const EliteApplicationForm: React.FC<EliteApplicationFormProps> = ({ selectedPlan, onSubmit, onCancel }) => {
   const [step, setStep] = useState<'form' | 'confirm'>('form');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState<MentorshipApplication>({
+  const [formData, setFormData] = useState<ExtendedMentorshipApplication>({
     fullName: '',
     email: '',
     discordId: '',
@@ -20,7 +25,8 @@ const EliteApplicationForm: React.FC<EliteApplicationFormProps> = ({ selectedPla
     currentCapital: '',
     biggestStruggle: 'Strategy & Edge',
     motivation: '',
-    commitmentAgreement: false
+    commitmentAgreement: false,
+    subscriptionTier: selectedPlan || 'free'
   });
 
   // Set the biggestStruggle to the first option if it's still the old default
@@ -48,6 +54,11 @@ const EliteApplicationForm: React.FC<EliteApplicationFormProps> = ({ selectedPla
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, commitmentAgreement: e.target.checked }));
+  };
+
+  // Add this new function for handling tier changes
+  const handleTierChange = (tier: string) => {
+    setFormData(prev => ({ ...prev, subscriptionTier: tier }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -220,7 +231,46 @@ const EliteApplicationForm: React.FC<EliteApplicationFormProps> = ({ selectedPla
               </div>
             </motion.div>
 
-            
+            {/* Add subscription tier selection */}
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-gradient-to-br from-gray-900/80 to-black/80 backdrop-blur-sm p-6 rounded-2xl border border-gray-800 shadow-xl"
+            >
+              <h3 className="font-bold mb-4 text-lg text-gray-200 flex items-center gap-2">
+                <Wallet className="text-trade-neon h-5 w-5" /> Select Your Plan
+              </h3>
+              <div className="space-y-3">
+                {[
+                  { value: 'free', label: 'Free Community Access', price: '$0', description: 'Basic access to our community platform' },
+                  { value: 'foundation', label: 'Foundation Course', price: '$47', description: 'Core course modules and community access' },
+                  { value: 'professional', label: 'Professional Program', price: '$97', description: 'Full course access with AI Trade Guard' },
+                  { value: 'elite', label: 'Elite Mentorship', price: '$297', description: 'Premium mentorship with personalized support' }
+                ].map((tier) => (
+                  <button
+                    key={tier.value}
+                    type="button"
+                    onClick={() => handleTierChange(tier.value)}
+                    className={`w-full text-left p-4 rounded-xl transition-all duration-300 ${
+                      formData.subscriptionTier === tier.value
+                        ? 'bg-gradient-to-r from-trade-neon/20 to-purple-600/20 border-2 border-trade-neon shadow-lg shadow-trade-neon/20'
+                        : 'bg-gray-800/50 border border-gray-700 hover:border-trade-neon hover:bg-gray-800/80'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-bold text-white">{tier.label}</div>
+                        <div className="text-sm text-gray-400">{tier.description}</div>
+                      </div>
+                      <div className={`font-bold ${formData.subscriptionTier === tier.value ? 'text-trade-neon' : 'text-gray-300'}`}>
+                        {tier.price}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
           </div>
 
           {/* Main Form */}
@@ -361,6 +411,9 @@ const EliteApplicationForm: React.FC<EliteApplicationFormProps> = ({ selectedPla
                   </label>
                 </div>
 
+                {/* Add hidden input to store subscription tier */}
+                <input type="hidden" name="subscriptionTier" value={formData.subscriptionTier} />
+                
                 <button 
                   type="submit"
                   disabled={isSubmitting || !formData.commitmentAgreement}

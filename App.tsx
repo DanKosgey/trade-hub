@@ -10,12 +10,14 @@ import LandingPage from './components/LandingPage';
 import EliteApplicationForm from './components/EliteApplicationForm';
 import RuleBuilder from './components/RuleBuilder';
 import CourseManagementSystem from './components/enhanced/CourseManagementSystem';
-import { ShieldAlert, Settings, Bot, BarChart, CheckSquare, PlayCircle, ArrowRight } from 'lucide-react';
+import { ShieldAlert, Settings, Bot, BarChart, CheckSquare, PlayCircle, ArrowRight, Lock } from 'lucide-react';
 import TradeJournal from './components/TradeJournal';
 import CommunityHub from './components/CommunityHub';
 import QuizPlayer from './components/QuizPlayer';
 import TodoList from './components/TodoList';
 import { courseService } from './services/courseService';
+import UnderReviewPage from './components/UnderReviewPage';
+import SignupPage from './components/SignupPage';
 
 // --- MOCK DATA ---
 
@@ -100,9 +102,9 @@ const MOCK_USER_ELITE_PENDING: User = {
 
 // --- APP COMPONENT ---
 
-type AppViewState = 'landing' | 'login' | 'portal' | 'application';
+type AppViewState = 'landing' | 'login' | 'signup' | 'portal' | 'application';
 
-function App() {
+const App: React.FC = () => {
   // App Logic State
   const [viewState, setViewState] = useState<AppViewState>('landing');
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
@@ -168,15 +170,20 @@ function App() {
       console.log('Auth state changed:', _event, session);
       if (session?.user) {
         fetchProfile(session.user.id, session.user.email!);
-        setViewState('portal');
+        // Only set view state to portal if we're not already in the middle of signup
+        if (viewState !== 'signup') {
+          setViewState('portal');
+        }
       } else {
         setUser(null);
-        setViewState('landing');
+        if (viewState !== 'signup' && viewState !== 'login') {
+          setViewState('landing');
+        }
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [viewState]);
 
   const fetchProfile = async (userId: string, email: string) => {
     try {
@@ -200,11 +207,18 @@ function App() {
           progress: 0
         });
 
-        // Set default view based on Role
+        // Set default view based on Role and Subscription Tier
         if (data.role === 'admin') {
           setPortalView('admin-dashboard');
         } else {
-          setPortalView('dashboard');
+          // Redirect based on subscription tier
+          if (data.subscription_tier.includes('-pending')) {
+            setPortalView('dashboard'); // Will show under review page
+          } else if (data.subscription_tier === 'free') {
+            setPortalView('community');
+          } else {
+            setPortalView('dashboard');
+          }
         }
       } else {
         console.error('No profile found for user:', userId);
@@ -216,20 +230,28 @@ function App() {
 
   // --- HANDLERS ---
 
-  const handleNavigationRequest = (tier: 'free' | 'foundation' | 'professional' | 'elite' | 'login') => {
+  const handleNavigationRequest = (tier: 'free' | 'foundation' | 'professional' | 'elite' | 'login' | 'signup') => {
     if (tier === 'login') {
       // Redirect to login page
       setViewState('login');
+    } else if (tier === 'signup') {
+      // Redirect to signup page
+      setViewState('signup');
     } else {
-      // For all plans, redirect to application form
-      setSelectedPlan('Elite Mentorship');
-      setViewState('application');
+      // For all plans, redirect to signup page instead of application form
+      setViewState('signup');
     }
   };
 
   const handlePlanSelection = (planName: string) => {
-    setSelectedPlan(planName);
-    setViewState('application');
+    if (planName === 'signup') {
+      // Handle signup navigation
+      setViewState('signup');
+      return;
+    }
+    
+    // For all plans, redirect to signup page instead of application form
+    setViewState('signup');
   };
 
   const handleLogin = (loggedInUser: User) => {
@@ -251,16 +273,28 @@ function App() {
     setPortalView('dashboard');
   };
 
-  const handleApplicationSubmit = (data: MentorshipApplication) => {
+  const handleApplicationSubmit = (data: any) => {
+    // Set the user's subscription tier based on their selection
+    const subscriptionTier = data.subscriptionTier || 'free';
+    
     const applicantUser: User = {
       ...MOCK_USER_ELITE_PENDING,
       name: data.fullName,
-      email: data.email
+      email: data.email,
+      subscriptionTier: subscriptionTier as any
     };
+    
     // Auto-login as the pending user
     setUser(applicantUser);
     setViewState('portal');
-    setPortalView('dashboard');
+    
+    // If it's a free tier, redirect to community immediately
+    if (subscriptionTier === 'free' || subscriptionTier === 'foundation') {
+      setPortalView('community');
+    } else {
+      // For paid tiers, show under review page
+      setPortalView('dashboard'); // Will show under review page for elite-pending users
+    }
   };
 
   // Journal Handlers
@@ -343,6 +377,15 @@ function App() {
     );
   }
 
+  if (viewState === 'signup') {
+    return (
+      <SignupPage
+        onBack={() => setViewState('landing')}
+        onSignupSuccess={() => setViewState('portal')}
+      />
+    );
+  }
+
   // Authenticated Portal View
   if (user) {
     const renderContent = () => {
@@ -371,20 +414,22 @@ function App() {
       if (user.role === 'admin') {
         switch (portalView) {
           case 'admin-dashboard':
-            return <AdminPortal courses={courses} initialTab="overview" />;
+            return <AdminPortal courses={courses} initialTab="overview" user={user} />;
           case 'admin-students':
-            return <AdminPortal courses={courses} initialTab="directory" />;
+            return <AdminPortal courses={courses} initialTab="directory" user={user} />;
           case 'admin-trades':
-            return <AdminPortal courses={courses} initialTab="trades" />;
+            return <AdminPortal courses={courses} initialTab="trades" user={user} />;
           case 'admin-analytics':
-            return <AdminPortal courses={courses} initialTab="analytics" />;
+            return <AdminPortal courses={courses} initialTab="analytics" user={user} />;
           case 'admin-rules':
             return (
-              <RuleBuilder
-                userId="00000000-0000-0000-0000-000000000000"
-                rules={tradeRules}
-                onRulesChange={setTradeRules}
-              />
+              <div className="h-full">
+                <RuleBuilder
+                  userId={user.id}
+                  rules={tradeRules}
+                  onRulesChange={setTradeRules}
+                />
+              </div>
             );
           case 'admin-content':
             // Map User to StudentProfile for CourseManagementSystem
@@ -425,6 +470,18 @@ function App() {
       // --- STUDENT VIEWS ---
       switch (portalView) {
         case 'dashboard':
+          // Check if user is under review
+          if (user.subscriptionTier.includes('-pending')) {
+            return <UnderReviewPage userTier={user.subscriptionTier} onLogout={handleLogout} />;
+          }
+          
+          // For free users, redirect to community
+          if (user.subscriptionTier === 'free') {
+            setPortalView('community');
+            return <CommunityHub />;
+          }
+          
+          // For foundation and above, show dashboard
           return (
             <Dashboard
               user={user}
@@ -434,9 +491,12 @@ function App() {
           );
         case 'ai':
           // Access Control: Only Professional and Elite tiers can access AI
-          const hasAccess = user.subscriptionTier === 'professional' || user.subscriptionTier === 'elite';
+          // Pending users and free users cannot access
+          const hasAIAccess = (user.subscriptionTier === 'professional' || user.subscriptionTier === 'elite') && 
+                             !user.subscriptionTier.includes('-pending');
 
-          if (!hasAccess) {
+          if (!hasAIAccess) {
+            // For users without access, show the professional feature message
             return (
               <div className="flex flex-col items-center justify-center h-[60vh] text-center max-w-lg mx-auto animate-in fade-in zoom-in duration-300">
                 <div className="bg-gray-800 p-6 rounded-full mb-6 relative">
@@ -446,12 +506,19 @@ function App() {
 
                 <h2 className="text-3xl font-bold text-white mb-4">Professional Feature</h2>
 
-                {user.subscriptionTier === 'elite-pending' ? (
+                {user.subscriptionTier.includes('-pending') ? (
                   <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-xl text-yellow-200 max-w-md">
                     <p className="font-bold mb-2 text-lg">Application Under Review</p>
                     <p className="text-sm opacity-80">
-                      Your application for the Elite Mentorship is currently being processed by our team.
+                      Your application for the {user.subscriptionTier.replace('-pending', '').charAt(0).toUpperCase() + user.subscriptionTier.replace('-pending', '').slice(1)} tier is currently being processed by our team.
                       Access to the AI Assistant will be unlocked upon approval.
+                    </p>
+                  </div>
+                ) : user.subscriptionTier === 'free' ? (
+                  <div className="bg-gray-800/50 border border-gray-700 p-6 rounded-xl text-gray-200 max-w-md">
+                    <p className="font-bold mb-2 text-lg">Free Tier Limitation</p>
+                    <p className="text-sm opacity-80">
+                      The AI Trade Assistant is exclusively available to <span className="text-trade-neon font-bold">Professional</span> and <span className="text-purple-500 font-bold">Elite</span> members.
                     </p>
                   </div>
                 ) : (
@@ -486,6 +553,7 @@ function App() {
             );
           }
 
+          // For users with access, render the AI Trade Assistant
           return (
             <AITradeAssistant
               userId={user.id}
@@ -493,6 +561,56 @@ function App() {
             />
           );
         case 'journal':
+          // Access Control: Only foundation, professional, and elite tiers can access journals
+          // Pending users cannot access
+          const hasJournalAccess = (user.subscriptionTier === 'foundation' || 
+                                  user.subscriptionTier === 'professional' || 
+                                  user.subscriptionTier === 'elite') &&
+                                  !user.subscriptionTier.includes('-pending');
+
+          if (!hasJournalAccess) {
+            return (
+              <div className="flex flex-col items-center justify-center h-[60vh] text-center max-w-lg mx-auto animate-in fade-in zoom-in duration-300">
+                <div className="bg-gray-800 p-6 rounded-full mb-6 relative">
+                  <Lock className="h-12 w-12 mb-4 text-gray-500" />
+                  <div className="absolute -top-1 -right-1 bg-trade-neon/20 text-trade-neon text-xs font-bold px-2 py-1 rounded-full border border-trade-neon/50">PRO</div>
+                </div>
+
+                <h2 className="text-3xl font-bold text-white mb-4">Premium Feature</h2>
+
+                {user.subscriptionTier.includes('-pending') ? (
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-xl text-yellow-200 max-w-md">
+                    <p className="font-bold mb-2 text-lg">Application Under Review</p>
+                    <p className="text-sm opacity-80">
+                      Your application for the {user.subscriptionTier.replace('-pending', '').charAt(0).toUpperCase() + user.subscriptionTier.replace('-pending', '').slice(1)} tier is currently being processed by our team.
+                      Access to the Trade Journal will be unlocked upon approval.
+                    </p>
+                  </div>
+                ) : user.subscriptionTier === 'free' ? (
+                  <div className="bg-gray-800/50 border border-gray-700 p-6 rounded-xl text-gray-200 max-w-md">
+                    <p className="font-bold mb-2 text-lg">Free Tier Limitation</p>
+                    <p className="text-sm opacity-80">
+                      The Trade Journal is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-gray-400 mb-8 text-lg leading-relaxed">
+                      The Trade Journal is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
+                    </p>
+
+                    <button 
+                      onClick={() => setPortalView('community')}
+                      className="mt-8 w-full max-w-sm py-4 bg-trade-neon text-black font-black text-lg rounded-xl hover:bg-green-400 transition shadow-lg shadow-trade-neon/20"
+                    >
+                      Back to Community
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          }
+
           return (
             <TradeJournal
               user={user} // Add the missing user prop
@@ -503,8 +621,108 @@ function App() {
             />
           );
         case 'todos':
+          // Access Control: Only foundation, professional, and elite tiers can access todos
+          // Pending users cannot access
+          const hasTodoAccess = (user.subscriptionTier === 'foundation' || 
+                               user.subscriptionTier === 'professional' || 
+                               user.subscriptionTier === 'elite') &&
+                               !user.subscriptionTier.includes('-pending');
+
+          if (!hasTodoAccess) {
+            return (
+              <div className="flex flex-col items-center justify-center h-[60vh] text-center max-w-lg mx-auto animate-in fade-in zoom-in duration-300">
+                <div className="bg-gray-800 p-6 rounded-full mb-6 relative">
+                  <Lock className="h-12 w-12 mb-4 text-gray-500" />
+                  <div className="absolute -top-1 -right-1 bg-trade-neon/20 text-trade-neon text-xs font-bold px-2 py-1 rounded-full border border-trade-neon/50">PRO</div>
+                </div>
+
+                <h2 className="text-3xl font-bold text-white mb-4">Premium Feature</h2>
+
+                {user.subscriptionTier.includes('-pending') ? (
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-xl text-yellow-200 max-w-md">
+                    <p className="font-bold mb-2 text-lg">Application Under Review</p>
+                    <p className="text-sm opacity-80">
+                      Your application for the {user.subscriptionTier.replace('-pending', '').charAt(0).toUpperCase() + user.subscriptionTier.replace('-pending', '').slice(1)} tier is currently being processed by our team.
+                      Access to the Task Manager will be unlocked upon approval.
+                    </p>
+                  </div>
+                ) : user.subscriptionTier === 'free' ? (
+                  <div className="bg-gray-800/50 border border-gray-700 p-6 rounded-xl text-gray-200 max-w-md">
+                    <p className="font-bold mb-2 text-lg">Free Tier Limitation</p>
+                    <p className="text-sm opacity-80">
+                      The Task Manager is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-gray-400 mb-8 text-lg leading-relaxed">
+                      The Task Manager is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
+                    </p>
+
+                    <button 
+                      onClick={() => setPortalView('community')}
+                      className="mt-8 w-full max-w-sm py-4 bg-trade-neon text-black font-black text-lg rounded-xl hover:bg-green-400 transition shadow-lg shadow-trade-neon/20"
+                    >
+                      Back to Community
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          }
+
           return <TodoList userId={user.id} />;
         case 'courses':
+          // Access Control: Only foundation, professional, and elite tiers can access courses
+          // Pending users cannot access
+          const hasCourseAccess = (user.subscriptionTier === 'foundation' || 
+                                 user.subscriptionTier === 'professional' || 
+                                 user.subscriptionTier === 'elite') &&
+                                 !user.subscriptionTier.includes('-pending');
+
+          if (!hasCourseAccess) {
+            return (
+              <div className="flex flex-col items-center justify-center h-[60vh] text-center max-w-lg mx-auto animate-in fade-in zoom-in duration-300">
+                <div className="bg-gray-800 p-6 rounded-full mb-6 relative">
+                  <Lock className="h-12 w-12 mb-4 text-gray-500" />
+                  <div className="absolute -top-1 -right-1 bg-trade-neon/20 text-trade-neon text-xs font-bold px-2 py-1 rounded-full border border-trade-neon/50">PRO</div>
+                </div>
+
+                <h2 className="text-3xl font-bold text-white mb-4">Premium Feature</h2>
+
+                {user.subscriptionTier.includes('-pending') ? (
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-xl text-yellow-200 max-w-md">
+                    <p className="font-bold mb-2 text-lg">Application Under Review</p>
+                    <p className="text-sm opacity-80">
+                      Your application for the {user.subscriptionTier.replace('-pending', '').charAt(0).toUpperCase() + user.subscriptionTier.replace('-pending', '').slice(1)} tier is currently being processed by our team.
+                      Access to the Course Curriculum will be unlocked upon approval.
+                    </p>
+                  </div>
+                ) : user.subscriptionTier === 'free' ? (
+                  <div className="bg-gray-800/50 border border-gray-700 p-6 rounded-xl text-gray-200 max-w-md">
+                    <p className="font-bold mb-2 text-lg">Free Tier Limitation</p>
+                    <p className="text-sm opacity-80">
+                      The Course Curriculum is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-gray-400 mb-8 text-lg leading-relaxed">
+                      The Course Curriculum is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
+                    </p>
+
+                    <button 
+                      onClick={() => setPortalView('community')}
+                      className="mt-8 w-full max-w-sm py-4 bg-trade-neon text-black font-black text-lg rounded-xl hover:bg-green-400 transition shadow-lg shadow-trade-neon/20"
+                    >
+                      Back to Community
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          }
+
           // Map User to StudentProfile for CourseManagementSystem
           const studentProfile: StudentProfile = {
             id: user.id,
@@ -677,6 +895,6 @@ function App() {
   }
 
   return null; // Should not reach here
-}
+};
 
 export default App;

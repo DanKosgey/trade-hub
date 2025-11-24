@@ -623,3 +623,45 @@ export const reorderTradeRules = async (ruleIds: string[]) => {
     throw error;
   }
 };
+
+// Function to fetch pending applications (users with any pending subscription tier)
+export const fetchPendingApplications = async (): Promise<StudentProfile[]> => {
+  try {
+    console.log('Fetching users with pending subscription tiers...');
+    // Fetch users with any pending subscription tier
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .or('subscription_tier.eq.elite-pending,subscription_tier.eq.foundation-pending,subscription_tier.eq.professional-pending')
+      .eq('role', 'student')
+      .order('joined_date', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching pending applications:', error);
+      throw error;
+    }
+
+    console.log('Pending applications data:', data);
+
+    // Transform the data to match StudentProfile interface
+    return data.map((user: any) => ({
+      id: user.id,
+      name: user.full_name,
+      email: user.email,
+      tier: user.subscription_tier,
+      joinedDate: user.joined_date,
+      status: 'active', // Pending applications are considered active
+      stats: {
+        winRate: 0,
+        totalPnL: 0,
+        tradesCount: 0,
+        avgRiskReward: 0,
+        currentDrawdown: 0
+      },
+      recentTrades: [] // Will be populated separately if needed
+    }));
+  } catch (error) {
+    console.error('Error fetching pending applications:', error);
+    throw error;
+  }
+};

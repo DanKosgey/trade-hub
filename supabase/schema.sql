@@ -4,7 +4,7 @@ create table profiles (
   id uuid references auth.users not null primary key,
   email text,
   full_name text,
-  subscription_tier text default 'foundation', -- 'foundation', 'professional', 'elite', 'elite-pending'
+  subscription_tier text default 'free', -- 'free', 'foundation', 'professional', 'elite', 'elite-pending'
   role text default 'student', -- 'student', 'admin'
   joined_date timestamp with time zone default timezone('utc'::text, now()),
   
@@ -85,8 +85,8 @@ create policy "Users can insert/update own progress."
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, email, full_name)
-  values (new.id, new.email, new.raw_user_meta_data->>'full_name');
+  insert into public.profiles (id, email, full_name, subscription_tier)
+  values (new.id, new.email, new.raw_user_meta_data->>'full_name', 'free');
   return new;
 end;
 $$ language plpgsql security definer;

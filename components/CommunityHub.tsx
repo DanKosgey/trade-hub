@@ -4,13 +4,22 @@ import { socialMediaService } from '../services/socialMediaService';
 import { CommunityLink } from '../types';
 
 interface CommunityHubProps {
-  subscriptionTier?: 'foundation' | 'professional' | 'elite' | 'elite-pending' | null;
+  subscriptionTier?: 'free' | 'foundation' | 'professional' | 'elite' | 'elite-pending' | 'foundation-pending' | 'professional-pending' | null;
   userId?: string;
   onJoinCommunity?: (platform: string) => void;
 }
 
 const CommunityHub: React.FC<CommunityHubProps> = ({ subscriptionTier, userId, onJoinCommunity }) => {
-  const hasPremiumAccess = subscriptionTier === 'professional' || subscriptionTier === 'elite';
+  // Only foundation, professional, and elite tiers have premium access
+  // Pending users do not have premium access
+  const hasPremiumAccess = (subscriptionTier === 'foundation' || 
+                          subscriptionTier === 'professional' || 
+                          subscriptionTier === 'elite') &&
+                          subscriptionTier !== null && 
+                          !subscriptionTier.includes('-pending');
+  
+  const isPendingUser = subscriptionTier && subscriptionTier.includes('-pending');
+  
   const [communityLinks, setCommunityLinks] = useState<CommunityLink[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -87,6 +96,20 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ subscriptionTier, userId, o
         </div>
       </div>
 
+      {/* Application Status Notice for Pending Users */}
+      {isPendingUser && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-2xl text-yellow-200">
+          <div className="flex items-center gap-3 mb-2">
+            <Shield className="h-5 w-5" />
+            <h3 className="font-bold text-lg">Application Under Review</h3>
+          </div>
+          <p className="text-sm">
+            Your application for the {subscriptionTier?.replace('-pending', '').charAt(0).toUpperCase() + subscriptionTier?.replace('-pending', '').slice(1) || 'premium'} tier is currently being processed by our team. 
+            You'll have full access to all premium features once approved. As a pending applicant, you can participate in our general community discussions.
+          </p>
+        </div>
+      )}
+
       {/* Premium Groups Section */}
       <div>
         <div className="flex items-center gap-3 mb-6">
@@ -116,8 +139,14 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ subscriptionTier, userId, o
                 {!hasPremiumAccess && (
                   <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center rounded-2xl text-center p-6">
                     <Lock className="h-8 w-8 text-gray-500 mb-2" />
-                    <p className="text-white font-bold">Professional Tier Required</p>
-                    <p className="text-sm text-gray-400 mt-1">Upgrade to access this premium group.</p>
+                    <p className="text-white font-bold">
+                      {isPendingUser ? 'Pending Approval' : 'Professional Tier Required'}
+                    </p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      {isPendingUser 
+                        ? 'Access will be unlocked upon approval.' 
+                        : 'Upgrade to access this premium group.'}
+                    </p>
                   </div>
                 )}
 
@@ -137,7 +166,7 @@ const CommunityHub: React.FC<CommunityHubProps> = ({ subscriptionTier, userId, o
                   {link.description}
                 </p>
                 <div className={`inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wider ${hasPremiumAccess ? '' : 'text-gray-600'}`} style={{ color: hasPremiumAccess ? link.iconColor : '' }}>
-                  {hasPremiumAccess ? 'Join Group' : 'Locked'}
+                  {hasPremiumAccess ? 'Join Group' : (isPendingUser ? 'Pending Approval' : 'Locked')}
                 </div>
               </div>
             ))}

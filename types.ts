@@ -6,7 +6,7 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
-  subscriptionTier: 'free' | 'foundation' | 'professional' | 'elite' | 'elite-pending' | null;
+  subscriptionTier: 'free' | 'foundation' | 'professional' | 'elite' | 'elite-pending';
   progress: number;
 }
 

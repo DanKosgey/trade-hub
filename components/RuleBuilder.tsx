@@ -13,7 +13,7 @@ interface RuleBuilderProps {
   onRulesChange: (rules: TradeRule[]) => void;
 }
 
-const RuleBuilder: React.FC<RuleBuilderProps> = React.memo(({ userId, rules, onRulesChange }) => {
+const RuleBuilderComponent: React.FC<RuleBuilderProps> = ({ userId, rules, onRulesChange }) => {
   const [activeTab, setActiveTab] = useState<'buy' | 'sell'>('buy');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
@@ -67,7 +67,7 @@ const RuleBuilder: React.FC<RuleBuilderProps> = React.memo(({ userId, rules, onR
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []); // Empty dependency array to prevent infinite loops
+  }, [userId, loadRules]); // Include userId and loadRules in dependencies
 
   // Filter rules by active tab
   const activeRules = rules
@@ -536,6 +536,9 @@ const RuleBuilder: React.FC<RuleBuilderProps> = React.memo(({ userId, rules, onR
       </div>
     </div>
   );
-});
+};
+
+// Create a properly typed component with React.memo
+const RuleBuilder = React.memo(RuleBuilderComponent);
 
 export default RuleBuilder;

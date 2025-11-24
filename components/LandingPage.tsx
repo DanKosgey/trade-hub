@@ -5,15 +5,10 @@ import { socialMediaService } from '../services/socialMediaService';
 import { SubscriptionPlan } from '../types';
 
 interface LandingPageProps {
-  onSelectTier: (tier: 'free' | 'foundation' | 'professional' | 'elite') => void;
-}
-
-// Let's add a new interface for plan selection
-interface LandingPagePropsWithPlanSelection extends LandingPageProps {
+  onSelectTier: (tier: 'free' | 'foundation' | 'professional' | 'elite' | 'login') => void;
   onPlanSelection?: (planName: string) => void;
 }
 
-// We'll keep the original interface for compatibility
 const AnimatedCandles: React.FC<{ direction: 'bull' | 'bear' }> = ({ direction }) => {
   const candles = direction === 'bull'
     ? [30, 25, 40, 35, 55, 48, 70, 85, 110]
@@ -43,7 +38,7 @@ const AnimatedCandles: React.FC<{ direction: 'bull' | 'bear' }> = ({ direction }
   );
 };
 
-const LandingPage: React.FC<LandingPageProps & { onPlanSelection?: (planName: string) => void }> = ({ onSelectTier, onPlanSelection }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier, onPlanSelection }) => {
   const [showBear, setShowBear] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
@@ -173,13 +168,28 @@ const LandingPage: React.FC<LandingPageProps & { onPlanSelection?: (planName: st
               whileTap={{ scale: 0.95 }}
               onClick={() => {
                 // Login button should redirect to login page
-                // We need to determine the correct way to trigger login view
-                // For now, let's use a special tier value to indicate login
-                onSelectTier('login' as any);
+                onSelectTier('login');
               }}
               className="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-1.5 sm:px-6 sm:py-2 md:py-3 rounded-lg sm:rounded-xl font-bold backdrop-blur transition text-xs sm:text-sm md:text-base"
             >
               Login <ArrowRight className="inline h-3 w-3 sm:h-4 sm:w-4 ml-1" />
+            </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                // Signup button should redirect to signup page
+                if (onPlanSelection) {
+                  onPlanSelection('signup');
+                } else {
+                  // Fallback to onSelectTier if onPlanSelection is not available
+                  onSelectTier('free');
+                }
+              }}
+              className="bg-trade-neon/10 hover:bg-trade-neon/20 border border-trade-neon/30 px-4 py-1.5 sm:px-6 sm:py-2 md:py-3 rounded-lg sm:rounded-xl font-bold backdrop-blur transition text-xs sm:text-sm md:text-base text-trade-neon"
+            >
+              Sign Up <ArrowRight className="inline h-3 w-3 sm:h-4 sm:w-4 ml-1" />
             </motion.button>
           </div>
         </nav>
@@ -262,7 +272,7 @@ const LandingPage: React.FC<LandingPageProps & { onPlanSelection?: (planName: st
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => onSelectTier('elite')}
+                onClick={() => onSelectTier('signup')}
                 className="group relative px-6 sm:px-8 md:px-12 py-4 sm:py-5 md:py-6 bg-trade-neon text-black font-black text-base sm:text-lg md:text-xl rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl shadow-trade-neon/50 w-full sm:w-auto"
               >
                 <span className="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
@@ -273,7 +283,7 @@ const LandingPage: React.FC<LandingPageProps & { onPlanSelection?: (planName: st
 
               <motion.button
                 whileHover={{ scale: 1.05 }}
-                onClick={() => onSelectTier('elite')} // Redirect to application form
+                onClick={() => onSelectTier('signup')} // Redirect to signup page
                 className="px-6 sm:px-8 md:px-10 py-4 sm:py-5 md:py-6 border-2 border-trade-neon/50 text-trade-neon font-bold text-base sm:text-lg rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 sm:gap-3 hover:bg-trade-neon/10 transition w-full sm:w-auto"
               >
                 <Play className="h-4 w-4 sm:h-6 sm:w-6" /> Watch Free Masterclass
@@ -339,7 +349,7 @@ const LandingPage: React.FC<LandingPageProps & { onPlanSelection?: (planName: st
                   <span className="text-red-500 font-bold">❌ Red Light:</span> STOP. You are about to lose money.
                 </p>
                 <button
-                  onClick={() => onSelectTier('elite')} // Redirect to application form
+                  onClick={() => onSelectTier('signup')} // Redirect to signup page
                   className="bg-white text-black px-6 sm:px-8 py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold text-base sm:text-lg hover:bg-gray-200 transition flex items-center gap-2"
                 >
                   Try AI Trade Guard <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -452,8 +462,8 @@ const LandingPage: React.FC<LandingPageProps & { onPlanSelection?: (planName: st
                           if (onPlanSelection && plan.name) {
                             onPlanSelection(plan.name);
                           } else {
-                            // For all plans, redirect to application form
-                            onSelectTier('elite');
+                            // For all plans, redirect to signup page instead of application form
+                            onSelectTier('signup');
                           }
                         }}
                         className={`w-full py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold transition text-sm sm:text-base ${
@@ -512,7 +522,7 @@ const LandingPage: React.FC<LandingPageProps & { onPlanSelection?: (planName: st
               transition={{ repeat: Infinity, duration: 2 }}
             >
               <button
-                onClick={() => onSelectTier('elite')}
+                onClick={() => onSelectTier('signup')}
                 className="px-6 sm:px-10 md:px-16 py-4 sm:py-5 md:py-6 sm:py-7 bg-trade-neon text-black text-lg sm:text-xl md:text-2xl font-black rounded-2xl sm:rounded-3xl shadow-2xl shadow-trade-neon/50 hover:shadow-trade-neon/70 transition w-full sm:w-auto max-w-md sm:max-w-lg mx-auto"
               >
                 Secure Your Spot Before Price Increase <Lock className="inline ml-2 h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />

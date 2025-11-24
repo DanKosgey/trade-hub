@@ -208,6 +208,161 @@ export const notificationService = {
     });
   },
 
+  // Create an application approval notification
+  async createApplicationApprovedNotification(studentId: string): Promise<Notification | null> {
+    try {
+      // Use RPC to create notification as system function
+      const { data, error } = await supabase.rpc('create_application_notification', {
+        p_profile_id: studentId,
+        p_title: 'Application Approved!',
+        p_message: 'Congratulations! Your application has been approved. You now have access to the Elite Mentorship program.',
+        p_type: 'success'
+      });
+
+      if (error) throw error;
+
+      // Wait a moment for the notification to be created and committed
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Try to fetch the notification by ID first (if data is a valid UUID)
+      if (data && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data)) {
+        try {
+          const { data: notificationData, error: fetchError } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('id', data)
+            .single();
+            
+          if (!fetchError && notificationData) {
+            return {
+              id: notificationData.id,
+              userId: notificationData.profile_id,
+              title: notificationData.title,
+              message: notificationData.message,
+              type: notificationData.type,
+              read: notificationData.read,
+              createdAt: notificationData.created_at,
+              relatedEntityId: notificationData.related_entity_id,
+              relatedEntityType: notificationData.related_entity_type
+            };
+          }
+        } catch (fetchError) {
+          // If fetching by ID fails, fall back to fetching by profile_id
+          console.warn('Failed to fetch notification by ID, falling back to profile-based fetch:', fetchError);
+        }
+      }
+      
+      // Fallback: Fetch the most recent notification for this user
+      const { data: notificationData, error: fetchError } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('profile_id', studentId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      return {
+        id: notificationData.id,
+        userId: notificationData.profile_id,
+        title: notificationData.title,
+        message: notificationData.message,
+        type: notificationData.type,
+        read: notificationData.read,
+        createdAt: notificationData.created_at,
+        relatedEntityId: notificationData.related_entity_id,
+        relatedEntityType: notificationData.related_entity_type
+      };
+    } catch (error) {
+      console.error('Error creating application approved notification:', error);
+      return null;
+    }
+  },
+
+  // Create an application rejection notification
+  async createApplicationRejectedNotification(studentId: string): Promise<Notification | null> {
+    try {
+      // Use RPC to create notification as system function
+      const { data, error } = await supabase.rpc('create_application_notification', {
+        p_profile_id: studentId,
+        p_title: 'Application Status Update',
+        p_message: 'We\'ve reviewed your application. While you didn\'t qualify for the Elite program this time, you still have access to our Free Community features.',
+        p_type: 'info'
+      });
+
+      if (error) throw error;
+
+      // Wait a moment for the notification to be created and committed
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Try to fetch the notification by ID first (if data is a valid UUID)
+      if (data && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data)) {
+        try {
+          const { data: notificationData, error: fetchError } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('id', data)
+            .single();
+            
+          if (!fetchError && notificationData) {
+            return {
+              id: notificationData.id,
+              userId: notificationData.profile_id,
+              title: notificationData.title,
+              message: notificationData.message,
+              type: notificationData.type,
+              read: notificationData.read,
+              createdAt: notificationData.created_at,
+              relatedEntityId: notificationData.related_entity_id,
+              relatedEntityType: notificationData.related_entity_type
+            };
+          }
+        } catch (fetchError) {
+          // If fetching by ID fails, fall back to fetching by profile_id
+          console.warn('Failed to fetch notification by ID, falling back to profile-based fetch:', fetchError);
+        }
+      }
+      
+      // Fallback: Fetch the most recent notification for this user
+      const { data: notificationData, error: fetchError } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('profile_id', studentId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      return {
+        id: notificationData.id,
+        userId: notificationData.profile_id,
+        title: notificationData.title,
+        message: notificationData.message,
+        type: notificationData.type,
+        read: notificationData.read,
+        createdAt: notificationData.created_at,
+        relatedEntityId: notificationData.related_entity_id,
+        relatedEntityType: notificationData.related_entity_type
+      };
+    } catch (error) {
+      console.error('Error creating application rejected notification:', error);
+      return null;
+    }
+  },
+
+  // Create an application under review notification
+  async createApplicationUnderReviewNotification(studentId: string): Promise<Notification | null> {
+    return this.createNotification({
+      userId: studentId,
+      title: 'Application Received',
+      message: 'Thank you for your application! Our team is reviewing your information and will get back to you within 48 hours.',
+      type: 'info',
+      read: false
+    });
+  },
+
   // Subscribe to real-time notifications
   subscribeToNotifications(userId: string, callback: (payload: any) => void) {
     const channel = supabase
