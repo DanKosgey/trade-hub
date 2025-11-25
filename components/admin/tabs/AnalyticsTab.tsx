@@ -1,26 +1,34 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAdminPortal } from '../AdminPortalContext';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from 'recharts';
 import { DollarSign, Users, TrendingUp, BarChart2 } from 'lucide-react';
 
 const AnalyticsTab: React.FC = () => {
-  const { businessMetrics, studentPenaltiesData, courseEnrollmentData, ruleViolationsData, students } = useAdminPortal();
+  const { businessMetrics, studentPenaltiesData, courseEnrollmentData, ruleViolationsData, fetchStudentPenaltiesData } = useAdminPortal();
+  
+  // Fetch student penalties data when component mounts
+  useEffect(() => {
+    fetchStudentPenaltiesData();
+  }, []);
   
   // Format data for charts
-  const formattedPenaltyData = (studentPenaltiesData || []).map(item => ({
-    name: item.name?.slice(0, 15) || 'Unknown',
-    penalties: item.totalPenalties || 0,
-    rejected: item.rejectedCount || 0,
-    warning: item.warningCount || 0
-  }));
+  const formattedPenaltyData = (studentPenaltiesData || [])
+    .filter((item: any) => item.total_penalties > 0) // Only show students with penalties
+    .map((item: any) => ({
+      name: (item.name || item.email || 'Unknown').slice(0, 15),
+      penalties: item.total_penalties || 0,
+      rejected: item.rejected_count || 0,
+      warning: item.warning_count || 0
+    }))
+    .slice(0, 20); // Top 20 students
   
   const formattedCourseData = (courseEnrollmentData || []).map(item => ({
-    name: item.name?.slice(0, 20) || 'Unknown',
+    name: (item.name || 'Unknown').slice(0, 20),
     completion: item.count > 0 ? Math.round((item.completed / item.count) * 100) : 0
   }));
   
   const formattedViolationData = (ruleViolationsData || []).map(item => ({
-    rule: item.rule || 'Unknown',
+    rule: (item.rule || 'Unknown').slice(0, 20),
     count: item.count || 0
   }));
   

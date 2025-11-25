@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { TradeEntry, TradeOutcome, TradeValidationStatus, User } from '../types';
 import { journalService } from '../services/journalService';
 import { supabase } from '../supabase/client';
-import { validateTradeWithGeminiForUser } from '../services/geminiService';
 import { exportTradeJournal } from '../services/exportService';
 import { 
   Plus, Search, Filter, ArrowUpRight, ArrowDownRight, MoreHorizontal, 
@@ -29,6 +28,8 @@ type SortDirection = 'asc' | 'desc';
 const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
   const [entries, setEntries] = useState<TradeEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null); // Add this state for delete operations
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -255,6 +256,7 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaving(true);
     try {
       // Automatically determine trade status based on P&L if provided
       let status = formData.status || 'pending';
@@ -354,36 +356,9 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
         }
       } else {
         // Create new entry
-        // If this is a new trade entry and user wants AI validation, run it
-        if (formData.validationResult === 'none' || !formData.validationResult) {
-          // Prepare trade details for AI validation
-          const tradeDetails = `
-            Pair: ${entryData.pair}
-            Type: ${entryData.type}
-            Entry Price: ${entryData.entryPrice}
-            Stop Loss: ${entryData.stopLoss}
-            Take Profit: ${entryData.takeProfit}
-            Strategy: ${entryData.strategy || 'Not specified'}
-            Time Frame: ${entryData.timeFrame || 'Not specified'}
-            Market Condition: ${entryData.marketCondition || 'Not specified'}
-            Confidence Level: ${entryData.confidenceLevel || 'Not specified'}
-            Notes: ${entryData.notes || 'None'}
-          `;
-
-          try {
-            const validation = await validateTradeWithGeminiForUser(
-              user.id,
-              tradeDetails,
-              entryData.screenshotUrl
-            );
-
-            // Update the entryData with AI validation result
-            entryData.validationResult = validation.verdict.toLowerCase() as TradeValidationStatus;
-          } catch (validationError) {
-            console.error('AI validation error:', validationError);
-            // If AI validation fails, we'll still save the trade but mark validation as failed
-            entryData.validationResult = 'warning';
-          }
+        // Set default validation result to 'none' if not specified
+        if (!entryData.validationResult) {
+          entryData.validationResult = 'none';
         }
 
         const result = await journalService.createJournalEntry(entryData, user.id);
@@ -397,6 +372,8 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
     } catch (err) {
       console.error('Error saving journal entry:', err);
       setError('Failed to save journal entry');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -489,8 +466,8 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="flex flex-col items-center">
-          <Loader2 className="h-8 w-8 animate-spin text-trade-neon" />
-          <p className="mt-2 text-gray-400">Loading journal entries...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <p className="mt-2 text-gray-400">Loading your journal entries...</p>
         </div>
       </div>
     );
@@ -510,6 +487,30 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
       </div>
     );
   }
+
+  // Add this function to handle delete operations
+  const handleDeleteEntry = async (entryId: string) => {
+    if (!window.confirm('Are you sure you want to delete this trade entry? This action cannot be undone.')) {
+      return;
+    }
+    
+    setDeleting(entryId);
+    try {
+      const success = await journalService.deleteJournalEntry(entryId);
+      if (success) {
+        // The real-time subscription will automatically update the entries list
+        // But we can also manually remove it for immediate feedback
+        setEntries(prev => prev.filter(entry => entry.id !== entryId));
+      } else {
+        setError('Failed to delete journal entry');
+      }
+    } catch (err) {
+      console.error('Error deleting journal entry:', err);
+      setError('Failed to delete journal entry');
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   // Function to handle export
   const handleExport = async (format: 'csv' | 'pdf') => {
@@ -649,7 +650,6 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
               <th className="p-4 font-medium">Type</th>
               <th className="p-4 font-medium">Setup Notes</th>
               <th className="p-4 font-medium text-center">Chart</th>
-              <th className="p-4 font-medium">AI Check</th>
               <th className="p-4 font-medium text-right">P&L</th>
               <th className="p-4 font-medium text-center">Outcome</th>
               <th className="p-4"></th>
@@ -686,12 +686,6 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                     <span className="text-gray-700">-</span>
                   )}
                 </td>
-                <td className="p-4">
-                  {entry.validationResult === 'approved' && <span className="text-green-400 text-xs border border-green-500/30 bg-green-500/10 px-2 py-1 rounded flex items-center gap-1 w-fit"><CheckCircle className="h-3 w-3" /> Approved</span>}
-                  {entry.validationResult === 'warning' && <span className="text-yellow-400 text-xs border border-yellow-500/30 bg-yellow-500/10 px-2 py-1 rounded flex items-center gap-1 w-fit"><AlertCircle className="h-3 w-3" /> Warning</span>}
-                  {entry.validationResult === 'rejected' && <span className="text-red-400 text-xs border border-red-500/30 bg-red-500/10 px-2 py-1 rounded flex items-center gap-1 w-fit"><XCircle className="h-3 w-3" /> Rejected</span>}
-                  {entry.validationResult === 'none' && <span className="text-gray-600 text-xs">-</span>}
-                </td>
                 <td className={`p-4 text-right font-mono font-bold ${
                   entry.pnl && entry.pnl > 0 ? 'text-green-400' : 
                   entry.pnl && entry.pnl < 0 ? 'text-red-400' : 'text-gray-500'
@@ -708,22 +702,36 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                   </div>
                 </td>
                 <td className="p-4 text-right">
-                  <button 
-                    onClick={() => handleEditEntry(entry)}
-                    className="text-gray-400 hover:text-white transition p-1.5 rounded-lg hover:bg-gray-700"
-                    title="Edit Entry"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
-                      <path d="m15 5 4 4"/>
-                    </svg>
-                  </button>
+                  <div className="flex justify-end gap-1">
+                    <button 
+                      onClick={() => handleEditEntry(entry)}
+                      className="text-gray-400 hover:text-white transition p-1.5 rounded-lg hover:bg-gray-700"
+                      title="Edit Entry"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                        <path d="m15 5 4 4"/>
+                      </svg>
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteEntry(entry.id)}
+                      disabled={deleting === entry.id}
+                      className="text-gray-400 hover:text-red-400 transition p-1.5 rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                      title="Delete Entry"
+                    >
+                      {deleting === entry.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
             {processedEntries.length === 0 && (
               <tr>
-                <td colSpan={9} className="p-12 text-center">
+                <td colSpan={8} className="p-12 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-500">
                         <Search className="h-8 w-8 mb-3 opacity-50" />
                         <p className="text-lg font-medium">No trades found</p>
@@ -1097,19 +1105,7 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                   </div>
                 </div>
 
-                {/* AI Validation (Read Only) */}
-                {formData.validationResult && formData.validationResult !== 'none' && (
-                   <div className="bg-gray-900 p-3 rounded border border-gray-700 flex items-center justify-between">
-                      <span className="text-sm text-gray-400">AI Verification Status</span>
-                      <span className={`text-xs font-bold px-2 py-1 rounded uppercase ${
-                        formData.validationResult === 'approved' ? 'bg-green-500/20 text-green-400' :
-                        formData.validationResult === 'rejected' ? 'bg-red-500/20 text-red-400' :
-                        'bg-yellow-500/20 text-yellow-400'
-                      }`}>
-                        {formData.validationResult}
-                      </span>
-                   </div>
-                )}
+
               </div>
 
               <div className="p-6 border-t border-gray-700 flex justify-end gap-3 bg-gray-800/50 rounded-b-2xl">
@@ -1122,10 +1118,20 @@ const TradeJournal: React.FC<TradeJournalProps> = ({ user }) => {
                 </button>
                 <button 
                   type="submit"
-                  className="px-6 py-2 bg-trade-accent hover:bg-blue-600 text-white rounded-lg font-medium flex items-center gap-2 transition shadow-lg shadow-blue-900/20"
+                  disabled={saving}
+                  className="px-6 py-2 bg-trade-accent hover:bg-blue-600 text-white rounded-lg font-medium flex items-center gap-2 transition shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Save className="h-4 w-4" /> 
-                  {editingEntry ? 'Update Entry' : 'Save Entry'}
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> 
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" /> 
+                      {editingEntry ? 'Update Entry' : 'Save Entry'}
+                    </>
+                  )}
                 </button>
               </div>
             </form>

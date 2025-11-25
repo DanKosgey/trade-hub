@@ -259,6 +259,7 @@ export const AdminPortalProvider: React.FC<{ children: React.ReactNode }> = ({ c
       revenueGrowthData,
       courseEnrollmentData,
       ruleViolationsData,
+      studentPenaltiesData,
       loading,
       error,
       // Data fetching functions

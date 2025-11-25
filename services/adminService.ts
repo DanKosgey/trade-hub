@@ -256,49 +256,14 @@ export const fetchStudentPenalties = async () => {
   try {
     console.log('Fetching student penalties data...');
     
-    // First, get all students
-    const { data: studentsData, error: studentsError } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, subscription_tier')
-      .eq('role', 'student');
+    // Use the new database function for better performance
+    const { data, error } = await supabase.rpc('get_student_penalties');
     
-    if (studentsError) throw studentsError;
+    if (error) throw error;
     
-    // Then get penalty counts for each student
-    const penaltyPromises = studentsData.map(async (student: any) => {
-      const { data: penaltiesData, error: penaltiesError } = await supabase
-        .from('journal_entries')
-        .select('validation_result')
-        .eq('user_id', student.id)
-        .in('validation_result', ['rejected', 'warning']);
-      
-      if (penaltiesError) throw penaltiesError;
-      
-      const rejectedCount = penaltiesData.filter((entry: any) => entry.validation_result === 'rejected').length;
-      const warningCount = penaltiesData.filter((entry: any) => entry.validation_result === 'warning').length;
-      
-      return {
-        id: student.id,
-        name: student.full_name,
-        email: student.email,
-        tier: student.subscription_tier,
-        rejectedCount,
-        warningCount,
-        totalPenalties: rejectedCount + warningCount
-      };
-    });
+    console.log('Top 20 students by penalties:', data);
     
-    const penaltyData = await Promise.all(penaltyPromises);
-    
-    // Sort by total penalties descending and take top 20
-    const top20Students = penaltyData
-      .filter((student: any) => student.totalPenalties > 0)
-      .sort((a: any, b: any) => b.totalPenalties - a.totalPenalties)
-      .slice(0, 20);
-    
-    console.log('Top 20 students by penalties:', top20Students);
-    
-    return top20Students;
+    return data || [];
   } catch (error: any) {
     console.error('Error fetching student penalties data:', error);
     console.error('Error details:', {
