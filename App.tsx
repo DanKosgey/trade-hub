@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import LoginPage from './components/LoginPage';
 import Dashboard from './components/Dashboard';
-import AdminPortal from './components/AdminPortal';
+import { AdminPortal, AdminPortalProvider } from './components/admin';
 import AITradeAssistant from './components/AITradeAssistant';
 import { supabase } from './supabase/client';
 import { User, StudentProfile, TradeRule, TradeEntry, CourseModule, MentorshipApplication } from './types';
@@ -414,13 +414,15 @@ const App: React.FC = () => {
       if (user.role === 'admin') {
         switch (portalView) {
           case 'admin-dashboard':
-            return <AdminPortal courses={courses} initialTab="overview" user={user} />;
           case 'admin-students':
-            return <AdminPortal courses={courses} initialTab="directory" user={user} />;
           case 'admin-trades':
-            return <AdminPortal courses={courses} initialTab="trades" user={user} />;
           case 'admin-analytics':
-            return <AdminPortal courses={courses} initialTab="analytics" user={user} />;
+          case 'settings':
+            return (
+              <AdminPortalProvider>
+                <AdminPortal courses={courses} user={user} />
+              </AdminPortalProvider>
+            );
           case 'admin-rules':
             return (
               <div className="h-full">
@@ -457,6 +459,15 @@ const App: React.FC = () => {
               />
             );
           default:
+            // Check if it's an admin tab that should use AdminPortal
+            if (portalView.startsWith('admin-') || portalView === 'settings') {
+              return (
+                <AdminPortalProvider>
+                  <AdminPortal courses={courses} user={user} />
+                </AdminPortalProvider>
+              );
+            }
+            
             return (
               <div className="flex flex-col items-center justify-center h-[50vh] text-gray-500">
                 <Settings className="h-12 w-12 mb-4 text-gray-700" />

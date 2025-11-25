@@ -142,21 +142,26 @@ export const socialMediaService = {
       
       if (error) throw error;
       
-      return {
-        id: data.id,
-        platformName: data.platform_name,
-        platformKey: data.platform_key,
-        linkUrl: data.link_url,
-        description: data.description,
-        iconColor: data.icon_color,
-        isActive: data.is_active,
-        sortOrder: data.sort_order,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at
-      };
-    } catch (error) {
-      console.error('Error creating community link:', error);
+      // Ensure we return the correct format
+      if (data) {
+        return {
+          id: data.id,
+          platformName: data.platform_name,
+          platformKey: data.platform_key,
+          linkUrl: data.link_url,
+          description: data.description,
+          iconColor: data.icon_color,
+          isActive: data.is_active,
+          sortOrder: data.sort_order,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at
+        };
+      }
       return null;
+    } catch (error: any) {
+      console.error('Error creating community link:', error);
+      // Re-throw the error so the calling function can handle it appropriately
+      throw error;
     }
   },
 
@@ -172,30 +177,35 @@ export const socialMediaService = {
           icon_color: updates.iconColor,
           is_active: updates.isActive,
           sort_order: updates.sortOrder,
-          updated_at: new Date()
+          updated_at: new Date().toISOString()
         })
         .eq('id', id);
       
       if (error) throw error;
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating community link:', error);
-      return false;
+      // Re-throw the error so the calling function can handle it appropriately
+      throw error;
     }
   },
 
   async deleteCommunityLink(id: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      console.log('Deleting community link with ID:', id);
+      const { data, error } = await supabase
         .from('community_links')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select(); // Add select() to get the deleted record
+      
+      console.log('Delete operation result:', { data, error });
       
       if (error) throw error;
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting community link:', error);
-      return false;
+      throw error; // Re-throw the error so the calling function can handle it appropriately
     }
   },
 
@@ -324,7 +334,7 @@ export const socialMediaService = {
           pair: updates.pair,
           signal_type: updates.signalType,
           confidence_level: updates.confidenceLevel,
-          updated_at: new Date()
+          updated_at: new Date().toISOString()
         })
         .eq('id', id);
       
@@ -546,6 +556,15 @@ export const socialMediaService = {
   async createSubscriptionPlan(plan: Omit<SubscriptionPlan, 'id' | 'createdAt' | 'updatedAt'>): Promise<SubscriptionPlan | null> {
     try {
       console.log('Creating subscription plan with data:', plan);
+      
+      // Ensure features is properly formatted as array
+      let formattedFeatures: string[] = [];
+      if (Array.isArray(plan.features)) {
+        formattedFeatures = plan.features;
+      } else if (typeof plan.features === 'string') {
+        formattedFeatures = (plan.features as string).split('\n').filter(f => f.trim());
+      }
+      
       const { data, error } = await supabase
         .from('subscription_plans')
         .insert({
@@ -553,7 +572,7 @@ export const socialMediaService = {
           description: plan.description,
           price: plan.price,
           interval: plan.interval,
-          features: plan.features,
+          features: formattedFeatures,
           is_active: plan.isActive,
           sort_order: plan.sortOrder
         })
@@ -564,18 +583,22 @@ export const socialMediaService = {
     
       if (error) throw error;
     
-      return {
-        id: data.id,
-        name: data.name,
-        description: data.description,
-        price: data.price,
-        interval: data.interval,
-        features: Array.isArray(data.features) ? data.features : (typeof data.features === 'string' ? JSON.parse(data.features) : []),
-        isActive: data.is_active,
-        sortOrder: data.sort_order,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at
-      };
+      // Ensure we return the correct format
+      if (data) {
+        return {
+          id: data.id,
+          name: data.name,
+          description: data.description,
+          price: data.price,
+          interval: data.interval,
+          features: Array.isArray(data.features) ? data.features : (typeof data.features === 'string' ? JSON.parse(data.features) : []),
+          isActive: data.is_active,
+          sortOrder: data.sort_order,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at
+        };
+      }
+      return null;
     } catch (error) {
       console.error('Error creating subscription plan:', error);
       return null;
@@ -584,18 +607,31 @@ export const socialMediaService = {
 
   async updateSubscriptionPlan(id: string, updates: Partial<SubscriptionPlan>): Promise<boolean> {
     try {
+      // Format features properly if provided
+      if (updates.features !== undefined) {
+        if (typeof updates.features === 'string') {
+          updates.features = (updates.features as string).split('\n').filter(f => f.trim());
+        }
+      }
+      
+      const updateData: any = {
+        name: updates.name,
+        description: updates.description,
+        price: updates.price,
+        interval: updates.interval,
+        is_active: updates.isActive,
+        sort_order: updates.sortOrder,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Only include features in update if provided
+      if (updates.features !== undefined) {
+        updateData.features = updates.features;
+      }
+      
       const { error } = await supabase
         .from('subscription_plans')
-        .update({
-          name: updates.name,
-          description: updates.description,
-          price: updates.price,
-          interval: updates.interval,
-          features: updates.features,
-          is_active: updates.isActive,
-          sort_order: updates.sortOrder,
-          updated_at: new Date()
-        })
+        .update(updateData)
         .eq('id', id);
       
       if (error) throw error;

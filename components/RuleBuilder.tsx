@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { TradeRule } from '../types';
 import { 
   Plus, Trash2, Edit2, CheckCircle, ArrowDown, 
@@ -18,7 +18,7 @@ const RuleBuilderComponent: React.FC<RuleBuilderProps> = ({ userId, rules, onRul
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editType, setEditType] = useState<'buy' | 'sell'>('buy');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   
@@ -31,7 +31,14 @@ const RuleBuilderComponent: React.FC<RuleBuilderProps> = ({ userId, rules, onRul
   const [simulatedResult, setSimulatedResult] = useState<'approved' | 'rejected' | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
 
-  // Load rules function
+  // Filter rules by active tab using useMemo for performance
+  const activeRules = useMemo(() => {
+    return rules
+      .filter(r => r.type === activeTab)
+      .sort((a, b) => (a.order_number || 0) - (b.order_number || 0));
+  }, [rules, activeTab]);
+
+  // Load rules function (now only called externally)
   const loadRules = useCallback(async () => {
     try {
       setLoading(true);
@@ -53,26 +60,25 @@ const RuleBuilderComponent: React.FC<RuleBuilderProps> = ({ userId, rules, onRul
     }
   }, [userId, onRulesChange]);
 
-  // Load rules on mount and setup realtime subscription
+  // Setup realtime subscription only once on mount
   useEffect(() => {
-    loadRules();
-    
     const channel = supabase
       .channel(`rule-changes-${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trade_rules' }, () => {
-        loadRules();
+        // Debounce the reload to prevent rapid successive calls
+        const timeoutId = setTimeout(() => {
+          loadRules();
+        }, 300);
+        
+        // Cleanup timeout on unmount or when dependencies change
+        return () => clearTimeout(timeoutId);
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, loadRules]); // Include userId and loadRules in dependencies
-
-  // Filter rules by active tab
-  const activeRules = rules
-    .filter(r => r.type === activeTab)
-    .sort((a, b) => (a.order_number || 0) - (b.order_number || 0));
+  }, [userId, loadRules]);
 
   // Edit handlers
   const handleStartEdit = (rule: TradeRule) => {
@@ -314,8 +320,15 @@ const RuleBuilderComponent: React.FC<RuleBuilderProps> = ({ userId, rules, onRul
               {activeRules.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <Settings className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No rules configured for {activeTab.toUpperCase()} setups.</p>
-                  <p className="text-sm mt-1">Add your first rule below.</p>
+                  <p className="text-base md:text-lg font-medium mb-2">No rules configured</p>
+                  <p className="text-sm mb-4">Add your first rule to get started with validation logic.</p>
+                  <button 
+                    onClick={handleAddNew}
+                    disabled={saving}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition disabled:opacity-50"
+                  >
+                    {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Add First Rule
+                  </button>
                 </div>
               ) : (
                 activeRules.map((rule, index) => (
