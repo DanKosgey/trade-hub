@@ -166,7 +166,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier, onPlanSelection
               className="inline-flex items-center gap-2 sm:gap-3 bg-trade-neon/10 border border-trade-neon/30 px-4 py-2 sm:px-6 sm:py-3 rounded-full mb-6 sm:mb-8"
             >
               <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-trade-neon animate-pulse" />
-              <span className="font-bold text-trade-neon tracking-wider text-xs sm:text-sm md:text-base">FUNDED TRADERS ONLY</span>
+              <span className="font-bold text-trade-neon tracking-wider text-xs sm:text-sm md:text-base">WELCOME TO WORLD OF PROBABILITIES</span>
             </motion.div>
 
             <motion.h1
@@ -185,8 +185,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier, onPlanSelection
               transition={{ delay: 0.6 }}
               className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 mb-8 sm:mb-12 max-w-2xl sm:max-w-3xl md:max-w-4xl mx-auto leading-relaxed"
             >
-              Alex's work speaks for itself. Institutional strategies turned <span className="text-trade-neon font-bold">Confusion into Clarity</span>.
-              Now you get the blueprint + an <span className="bg-trade-neon/20 px-1 py-0.5 sm:px-2 sm:py-1 rounded text-trade-neon font-bold">AI that blocks losing trades</span>.
+              <span className="text-trade-neon font-bold">Probability-Driven Profits, AI-Guarded Capital</span><br />
+              Institutional strategies simplified. Every trade <span className="bg-trade-neon/20 px-1 py-0.5 sm:px-2 sm:py-1 rounded text-trade-neon font-bold">vetted by artificial intelligence</span>.
             </motion.p>
 
             <motion.div
@@ -523,10 +523,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier, onPlanSelection
                 Secure Your Spot Before Price Increase <Lock className="inline ml-2 h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
               </button>
             </motion.div>
-
-            <p className="mt-6 sm:mt-8 text-red-400 font-bold text-base sm:text-lg">
-              ⏰ Price increases to $100 on January 1st, 2026
-            </p>
 
             <div className="mt-10 sm:mt-16 text-gray-600 text-xs sm:text-sm">
               &copy; 2025 Mbauni Protocol. All rights reserved. Trading involves risk.
