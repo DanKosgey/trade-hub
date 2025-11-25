@@ -588,17 +588,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
     setShowLinkForm(true);
   };
 
-  const handleLinkDelete = async (linkId: string) => {
-    try {
-      await socialMediaService.deleteCommunityLink(linkId);
-      setCommunityLinks(prev => prev.filter(l => l.id !== linkId));
-      alert('Community link deleted.');
-    } catch (err) {
-      console.error(err);
-      alert('Failed to delete community link.');
-    }
-  };
-
   const handlePlanEdit = (plan: SubscriptionPlan) => {
     setEditingPlan(plan);
     setShowPlanForm(true);
@@ -679,10 +668,22 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
   }, [adminTrades]);
 
   const handleCreateCommunityLink = async (link: any) => {
-    const newLink = await socialMediaService.createCommunityLink(link);
-    if (newLink) {
-      setCommunityLinks(prev => [...prev, newLink]);
-      setShowLinkForm(false);
+    try {
+      const newLink = await socialMediaService.createCommunityLink(link);
+      if (newLink) {
+        setCommunityLinks(prev => [...prev, newLink]);
+        setShowLinkForm(false);
+        alert('Community link created successfully.');
+        
+        // Refresh links data to ensure consistency
+        const updatedLinks = await socialMediaService.getAllCommunityLinks();
+        setCommunityLinks(updatedLinks || []);
+      } else {
+        alert('Failed to create community link. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error creating community link:', err);
+      alert('An error occurred while creating the community link.');
     }
   };
 
@@ -690,20 +691,45 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
     if (await socialMediaService.updateCommunityLink(id, updates)) {
       setCommunityLinks(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
       setEditingLink(null);
+      
+      // Refresh links data to ensure consistency
+      const updatedLinks = await socialMediaService.getAllCommunityLinks();
+      setCommunityLinks(updatedLinks || []);
     }
   };
 
   const handleDeleteCommunityLink = async (id: string) => {
-    if (window.confirm('Delete this link?') && await socialMediaService.deleteCommunityLink(id)) {
-      setCommunityLinks(prev => prev.filter(l => l.id !== id));
+    try {
+      const confirmed = window.confirm('Are you sure you want to delete this community link? This action cannot be undone.');
+      if (confirmed && await socialMediaService.deleteCommunityLink(id)) {
+        setCommunityLinks(prev => prev.filter(l => l.id !== id));
+        alert('Community link deleted successfully.');
+      } else if (confirmed) {
+        alert('Failed to delete community link. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error deleting community link:', err);
+      alert('An error occurred while deleting the community link.');
     }
   };
 
   const handleCreatePlan = async (plan: any) => {
-    const newPlan = await socialMediaService.createSubscriptionPlan(plan);
-    if (newPlan) {
-      setPlans(prev => [...prev, newPlan]);
-      setShowPlanForm(false);
+    try {
+      const newPlan = await socialMediaService.createSubscriptionPlan(plan);
+      if (newPlan) {
+        setPlans(prev => [...prev, newPlan]);
+        setShowPlanForm(false);
+        alert('Subscription plan created successfully.');
+        
+        // Refresh plans data to ensure consistency
+        const updatedPlans = await socialMediaService.getAllSubscriptionPlans();
+        setPlans(updatedPlans || []);
+      } else {
+        alert('Failed to create subscription plan. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error creating subscription plan:', err);
+      alert('An error occurred while creating the subscription plan.');
     }
   };
 
@@ -711,12 +737,25 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
     if (await socialMediaService.updateSubscriptionPlan(id, updates)) {
       setPlans(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
       setEditingPlan(null);
+      
+      // Refresh plans data to ensure consistency
+      const updatedPlans = await socialMediaService.getAllSubscriptionPlans();
+      setPlans(updatedPlans || []);
     }
   };
 
   const handleDeletePlan = async (id: string) => {
-    if (window.confirm('Delete this plan?') && await socialMediaService.deleteSubscriptionPlan(id)) {
-      setPlans(prev => prev.filter(p => p.id !== id));
+    try {
+      const confirmed = window.confirm('Are you sure you want to delete this subscription plan? This action cannot be undone.');
+      if (confirmed && await socialMediaService.deleteSubscriptionPlan(id)) {
+        setPlans(prev => prev.filter(p => p.id !== id));
+        alert('Subscription plan deleted successfully.');
+      } else if (confirmed) {
+        alert('Failed to delete subscription plan. Please try again.');
+      }
+    } catch (err) {
+      console.error('Error deleting subscription plan:', err);
+      alert('An error occurred while deleting the subscription plan.');
     }
   };
 
@@ -726,6 +765,80 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
       setSelectedStudent(fullStudent || student);
     } catch {
       setSelectedStudent(student);
+    }
+  };
+
+  const refreshSettingsData = async () => {
+    try {
+      const [links, plansData] = await Promise.all([
+        socialMediaService.getAllCommunityLinks(),
+        socialMediaService.getAllSubscriptionPlans()
+      ]);
+      
+      setCommunityLinks(links || []);
+      setPlans(plansData || []);
+      
+      // If no plans exist, create default ones
+      if (!plansData || plansData.length === 0) {
+        console.log('No subscription plans found. Creating default plans...');
+        // Create default plans
+        const defaultPlans: Omit<SubscriptionPlan, 'id' | 'createdAt' | 'updatedAt'>[] = [
+          {
+            name: 'Free Plan',
+            description: 'Basic access to the platform',
+            price: 0,
+            interval: 'one-time' as const,
+            features: ['Live Signals from Premium Groups', 'Basic Market Updates', 'Community Access'],
+            isActive: true,
+            sortOrder: 0
+          },
+          {
+            name: 'Foundation',
+            description: 'Core course modules and community access',
+            price: 45,
+            interval: 'one-time' as const,
+            features: ['Modules 1-4 (Core CRT)', 'Private Community', 'Monthly Group Q&A'],
+            isActive: true,
+            sortOrder: 1
+          },
+          {
+            name: 'Professional',
+            description: 'Full course access with AI Trade Guard',
+            price: 60,
+            interval: 'one-time' as const,
+            features: ['Everything in Foundation', 'AI Trade Guard Access', 'Full Course (Modules 1-6)', 'Advanced Journal & Analytics', 'Weekly Live Trading Room'],
+            isActive: true,
+            sortOrder: 2
+          },
+          {
+            name: 'Elite Mentorship',
+            description: 'Premium mentorship with personalized support',
+            price: 100,
+            interval: 'one-time' as const,
+            features: ['Everything in Pro', '2x Monthly 1-on-1 Calls', 'Private Signal Group', 'Lifetime Updates'],
+            isActive: true,
+            sortOrder: 3
+          }
+        ];
+      
+        // Create each plan
+        for (const plan of defaultPlans) {
+          try {
+            const newPlan = await socialMediaService.createSubscriptionPlan(plan);
+            if (newPlan) {
+              console.log(`Created plan: ${newPlan.name}`);
+            }
+          } catch (error) {
+            console.error(`Error creating plan ${plan.name}:`, error);
+          }
+        }
+      
+        // Refresh plans after creation
+        const updatedPlans = await socialMediaService.getAllSubscriptionPlans();
+        setPlans(updatedPlans || []);
+      }
+    } catch (err) {
+      console.error('Error refreshing settings data:', err);
     }
   };
 
@@ -1404,7 +1517,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-gray-200">Community Links Management</h2>
-              <button onClick={() => setShowLinkForm(true)} className="flex items-center gap-2 px-5 py-3 bg-trade-neon text-black font-bold rounded-xl hover:bg-green-400 transition-colors"><Plus className="h-5 w-5" /> New Link</button>
+              <div className="flex gap-2">
+                <button onClick={refreshSettingsData} className="flex items-center gap-2 px-5 py-3 bg-gray-700 text-white font-bold rounded-xl hover:bg-gray-600 transition-colors"><RefreshCw className="h-5 w-5" /> Refresh</button>
+                <button onClick={() => setShowLinkForm(true)} className="flex items-center gap-2 px-5 py-3 bg-trade-neon text-black font-bold rounded-xl hover:bg-green-400 transition-colors"><Plus className="h-5 w-5" /> New Link</button>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {communityLinks.map(link => (
@@ -1432,7 +1548,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ courses, initialTab = 'overvi
           <div className="space-y-6 pt-8 border-t border-gray-700/50">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-gray-200">Subscription Plans Management</h2>
-              <button onClick={() => setShowPlanForm(true)} className="flex items-center gap-2 px-5 py-3 bg-trade-neon text-black font-bold rounded-xl hover:bg-green-400 transition-colors"><Plus className="h-5 w-5" /> New Plan</button>
+              <div className="flex gap-2">
+                <button onClick={refreshSettingsData} className="flex items-center gap-2 px-5 py-3 bg-gray-700 text-white font-bold rounded-xl hover:bg-gray-600 transition-colors"><RefreshCw className="h-5 w-5" /> Refresh</button>
+                <button onClick={() => setShowPlanForm(true)} className="flex items-center gap-2 px-5 py-3 bg-trade-neon text-black font-bold rounded-xl hover:bg-green-400 transition-colors"><Plus className="h-5 w-5" /> New Plan</button>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {plans.map(plan => (

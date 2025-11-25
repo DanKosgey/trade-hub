@@ -354,8 +354,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier, onPlanSelection
           <div className="container mx-auto px-4 sm:px-6">
             <div className="text-center mb-10 sm:mb-16">
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-black mb-3 sm:mb-4">Choose Your Transformation</h2>
-              <p className="text-gray-400 text-sm sm:text-base">One-time payment. Lifetime access. No hidden fees.</p>
-              <p className="text-gray-400 text-sm sm:text-base mt-4">Account management services are available - just contact Alex or support staff</p>
             </div>
 
             {loadingPlans ? (
