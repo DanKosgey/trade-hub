@@ -484,15 +484,20 @@ const EnhancedCourseBuilder: React.FC<EnhancedCourseBuilderProps> = ({
                     {moduleFormData.contentType === 'video' ? 'Video Embed URL' : 'Article Text / Markdown'}
                   </label>
                   {moduleFormData.contentType === 'video' ? (
-                    <div className="relative">
-                      <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                      <input 
-                        type="text" 
-                        className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none pl-10"
-                        placeholder="https://www.youtube.com/embed/..."
-                        value={moduleFormData.content}
-                        onChange={e => setModuleFormData({...moduleFormData, content: e.target.value})}
-                      />
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                        <input 
+                          type="text" 
+                          className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none pl-10"
+                          placeholder="https://www.youtube.com/embed/... or https://www.youtube.com/watch?v=..."
+                          value={moduleFormData.content}
+                          onChange={e => setModuleFormData({...moduleFormData, content: e.target.value})}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Note: You can use standard YouTube URLs (watch?v=...) and they will be automatically converted to embed format.
+                      </p>
                     </div>
                   ) : (
                     <textarea

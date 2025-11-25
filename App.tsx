@@ -787,25 +787,58 @@ const App: React.FC = () => {
                 {lessonTab === 'content' ? (
                   <>
                     {activeLesson.contentType === 'video' ? (
-                      <div className="aspect-video bg-gray-900 flex items-center justify-center relative">
-                        {/* Mock Video Player UI */}
-                        <div className="absolute inset-0 flex items-center justify-center group">
-                          <PlayCircle className="h-20 w-20 text-white opacity-80 group-hover:opacity-100 group-hover:scale-110 transition duration-300 cursor-pointer" />
-                        </div>
-                        <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/90 to-transparent p-4">
-                          <div className="flex justify-between items-end">
-                            <div>
-                              <h2 className="font-bold text-lg">{activeLesson.title}</h2>
-                              <p className="text-sm text-gray-300">Chapter 1: Fundamentals</p>
+                      <div className="aspect-video bg-gray-900">
+                        {/* Function to convert YouTube URLs to embed format */}
+                        {(() => {
+                          const getEmbedUrl = (url: string | undefined) => {
+                            if (!url) return null;
+                            
+                            // Handle YouTube URLs
+                            if (url.includes('youtube.com/watch')) {
+                              const videoId = url.split('v=')[1]?.split('&')[0];
+                              if (videoId) {
+                                return `https://www.youtube.com/embed/${videoId}`;
+                              }
+                            } else if (url.includes('youtu.be/')) {
+                              const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+                              if (videoId) {
+                                return `https://www.youtube.com/embed/${videoId}`;
+                              }
+                            }
+                            
+                            // Return the original URL if it's already an embed URL or not a YouTube URL
+                            return url.includes('embed') || !url.includes('youtube.com') ? url : null;
+                          };
+                          
+                          const embedUrl = getEmbedUrl(activeLesson.content);
+                          
+                          return embedUrl ? (
+                            <iframe
+                              src={embedUrl}
+                              title={activeLesson.title}
+                              className="w-full h-full"
+                              frameBorder="0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          ) : activeLesson.content ? (
+                            <div className="w-full h-full flex items-center justify-center p-6">
+                              <div className="text-center">
+                                <PlayCircle className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                                <h3 className="text-xl font-bold text-gray-400 mb-2">Unable to Embed Video</h3>
+                                <p className="text-gray-500 mb-4">This video cannot be embedded. Please use a direct embed URL.</p>
+                                <p className="text-sm text-gray-600 bg-gray-800 p-3 rounded-lg break-words">{activeLesson.content}</p>
+                              </div>
                             </div>
-                            <span className="text-xs font-mono bg-black/50 px-2 py-1 rounded border border-white/10">
-                              {activeLesson.duration}
-                            </span>
-                          </div>
-                          <div className="w-full h-1 bg-gray-700 mt-4 rounded-full overflow-hidden">
-                            <div className="w-1/3 h-full bg-trade-neon"></div>
-                          </div>
-                        </div>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <div className="text-center">
+                                <PlayCircle className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                                <p className="text-gray-500">No video content available</p>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : (
                       <div className="p-12 bg-trade-dark min-h-[400px]">
