@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { motion, useAnimation, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Zap, Shield, TrendingUp, Play, Check, X, Star, Lock, AlertTriangle, CheckCircle } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { motion, useAnimation, AnimatePresence, Variants, useInView } from 'framer-motion';
+import { ArrowRight, Zap, Shield, TrendingUp, Play, Check, X, Star, Lock, AlertTriangle, CheckCircle, BarChart2, Rocket, Sparkles, Target, Users, Award, Clock } from 'lucide-react';
 import { socialMediaService } from '../services/socialMediaService';
 import { SubscriptionPlan } from '../types';
 
@@ -9,40 +9,508 @@ interface LandingPageProps {
   onPlanSelection?: (planName: string) => void;
 }
 
-const AnimatedCandles: React.FC<{ direction: 'bull' | 'bear' }> = ({ direction }) => {
-  const candles = direction === 'bull'
-    ? [30, 25, 40, 35, 55, 48, 70, 85, 110]
-    : [110, 100, 90, 80, 65, 50, 40, 30, 15];
+// New Advanced Trading Animation Component
+const TradingVisualization: React.FC<{ mode: 'bull' | 'bear' }> = ({ mode }) => {
+  const controls = useAnimation();
+  const [activeNodes, setActiveNodes] = useState<number[]>([]);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newNodes = Array.from({ length: 3 }, () => Math.floor(Math.random() * 8));
+      setActiveNodes(newNodes);
+      setTimeout(() => setActiveNodes([]), 800);
+    }, 1200);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    controls.start({
+      scale: [1, 1.02, 1],
+      transition: { duration: 3, repeat: Infinity, ease: "easeInOut" }
+    });
+  }, [controls]);
 
   return (
-    <div className="flex items-end justify-center h-32 sm:h-48 gap-1 sm:gap-2">
-      {candles.map((height, i) => (
+    <motion.div 
+      animate={controls}
+      className="relative w-full h-48 flex items-center justify-center"
+    >
+      {/* Animated Network Grid */}
+      <div className="absolute inset-0">
+        {/* Main Network Lines */}
+        <svg viewBox="0 0 200 100" className="w-full h-full">
+          <defs>
+            <linearGradient id="networkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor={mode === 'bull' ? "#06b6d4" : "#ef4444"} />
+              <stop offset="100%" stopColor={mode === 'bull' ? "#10b981" : "#f97316"} />
+            </linearGradient>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* Network Grid */}
+          {[
+            // Horizontal lines
+            { id: 1, d: "M20,20 L180,20" },
+            { id: 2, d: "M20,50 L180,50" },
+            { id: 3, d: "M20,80 L180,80" },
+            // Vertical lines
+            { id: 4, d: "M20,20 L20,80" },
+            { id: 5, d: "M100,20 L100,80" },
+            { id: 6, d: "M180,20 L180,80" },
+            // Diagonal lines
+            { id: 7, d: "M20,20 L180,80" },
+            { id: 8, d: "M180,20 L20,80" }
+          ].map((line) => (
+            <motion.path
+              key={line.id}
+              d={line.d}
+              stroke="url(#networkGradient)"
+              strokeWidth="1.5"
+              fill="none"
+              opacity="0.6"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ duration: 2, delay: line.id * 0.2 }}
+            />
+          ))}
+
+          {/* Network Nodes */}
+          {[
+            { id: 1, x: 20, y: 20 },
+            { id: 2, x: 100, y: 20 },
+            { id: 3, x: 180, y: 20 },
+            { id: 4, x: 20, y: 50 },
+            { id: 5, x: 100, y: 50 },
+            { id: 6, x: 180, y: 50 },
+            { id: 7, x: 20, y: 80 },
+            { id: 8, x: 100, y: 80 },
+            { id: 9, x: 180, y: 80 }
+          ].map((node) => (
+            <motion.g key={node.id}>
+              <motion.circle
+                cx={node.x}
+                cy={node.y}
+                r="4"
+                fill={mode === 'bull' ? "#06b6d4" : "#ef4444"}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: node.id * 0.1, type: "spring" }}
+              />
+              <motion.circle
+                cx={node.x}
+                cy={node.y}
+                r="8"
+                fill={mode === 'bull' ? "#06b6d4" : "#ef4444"}
+                animate={{ 
+                  scale: activeNodes.includes(node.id) ? [0, 1.5, 0] : 0,
+                  opacity: activeNodes.includes(node.id) ? [0.5, 0.8, 0] : 0
+                }}
+                transition={{ duration: 0.8 }}
+              />
+            </motion.g>
+          ))}
+
+          {/* Central Trading Orb */}
+          <motion.circle
+            cx="100"
+            cy="50"
+            r="15"
+            fill={`url(#networkGradient)`}
+            filter="url(#glow)"
+            animate={{
+              scale: [1, 1.1, 1],
+              opacity: [0.8, 1, 0.8],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          />
+
+          {/* Data Streams */}
+          <motion.g>
+            {/* Incoming Data Streams */}
+            {[...Array(6)].map((_, i) => (
+              <motion.circle
+                key={`in-${i}`}
+                cx={-10}
+                cy={15 + i * 15}
+                r="2"
+                fill={mode === 'bull' ? "#10b981" : "#ef4444"}
+                animate={{
+                  x: [0, 210],
+                  opacity: [0, 1, 0]
+                }}
+                transition={{
+                  duration: 3,
+                  delay: i * 0.3,
+                  repeat: Infinity,
+                  ease: "linear"
+                }}
+              />
+            ))}
+
+            {/* Processed Data Streams */}
+            {[...Array(6)].map((_, i) => (
+              <motion.circle
+                key={`out-${i}`}
+                cx={100}
+                cy={50}
+                r="1.5"
+                fill={mode === 'bull' ? "#06b6d4" : "#f97316"}
+                animate={{
+                  x: mode === 'bull' ? [0, 100] : [0, -100],
+                  y: mode === 'bull' ? [0, -40] : [0, 40],
+                  opacity: [1, 0.5, 0]
+                }}
+                transition={{
+                  duration: 2,
+                  delay: i * 0.2,
+                  repeat: Infinity,
+                  ease: "easeOut"
+                }}
+              />
+            ))}
+          </motion.g>
+
+          {/* Market Direction Indicator */}
+          <motion.g
+            animate={{
+              y: mode === 'bull' ? [-5, 0, -5] : [5, 0, 5]
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          >
+            <polygon
+              points={mode === 'bull' ? "100,25 95,35 105,35" : "100,75 95,65 105,65"}
+              fill={mode === 'bull' ? "#10b981" : "#ef4444"}
+            />
+            <motion.text
+              x="100"
+              y={mode === 'bull' ? "45" : "55"}
+              textAnchor="middle"
+              fill={mode === 'bull' ? "#10b981" : "#ef4444"}
+              fontSize="8"
+              fontWeight="bold"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1 }}
+            >
+              {mode === 'bull' ? "BULL" : "BEAR"}
+            </motion.text>
+          </motion.g>
+        </svg>
+      </div>
+
+      {/* Floating Analysis Elements */}
+      <div className="absolute inset-0">
+        {[...Array(12)].map((_, i) => (
+          <motion.div
+            key={i}
+            className={`absolute text-xs font-bold ${
+              mode === 'bull' ? 'text-green-400' : 'text-red-400'
+            }`}
+            style={{
+              left: `${Math.random() * 80 + 10}%`,
+              top: `${Math.random() * 60 + 20}%`,
+            }}
+            animate={{
+              y: mode === 'bull' 
+                ? [0, -20 - Math.random() * 30, 0]
+                : [0, 20 + Math.random() * 30, 0],
+              opacity: [0, 1, 0],
+              scale: [0, 1, 0]
+            }}
+            transition={{
+              duration: Math.random() * 3 + 2,
+              delay: i * 0.3,
+              repeat: Infinity,
+              repeatDelay: Math.random() * 2
+            }}
+          >
+            {mode === 'bull' ? '📈' : '📉'}
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Pulse Rings */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        {[0, 1, 2].map((i) => (
+          <motion.div
+            key={i}
+            className="absolute rounded-full border-2"
+            style={{
+              borderColor: mode === 'bull' ? '#06b6d4' : '#ef4444',
+              width: '80px',
+              height: '80px',
+            }}
+            animate={{
+              scale: [0.5, 2],
+              opacity: [0.8, 0],
+            }}
+            transition={{
+              duration: 3,
+              delay: i * 1,
+              repeat: Infinity,
+              ease: "easeOut"
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Status Display */}
+      <motion.div
+        className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-black/70 backdrop-blur-sm px-6 py-3 rounded-full border"
+        style={{
+          borderColor: mode === 'bull' ? 'rgba(6,182,212,0.5)' : 'rgba(239,68,68,0.5)',
+        }}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1 }}
+      >
+        <div className="flex items-center gap-3 text-white text-sm font-bold">
+          <motion.div
+            className="w-2 h-2 rounded-full"
+            style={{
+              background: mode === 'bull' ? '#10b981' : '#ef4444',
+            }}
+            animate={{
+              scale: [1, 1.5, 1],
+            }}
+            transition={{
+              duration: 1,
+              repeat: Infinity
+            }}
+          />
+          <span>MARKET {mode === 'bull' ? 'BULL' : 'BEAR'} MODE</span>
+          <motion.span
+            animate={{
+              rotate: [0, 360],
+            }}
+            transition={{
+              duration: 3,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+          >
+            {mode === 'bull' ? '🚀' : '⚡'}
+          </motion.span>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// Enhanced Market Vibe Visualization with new animation
+const MarketVibeVisualization: React.FC<{ vibe: 'bull' | 'bear' }> = ({ vibe }) => {
+  const controls = useAnimation();
+  
+  useEffect(() => {
+    controls.start({
+      scale: [1, 1.02, 1],
+      transition: { duration: 4, repeat: Infinity, ease: "easeInOut" }
+    });
+  }, [controls]);
+  
+  return (
+    <motion.div 
+      animate={controls}
+      className="relative w-full h-48 flex items-center justify-center"
+    >
+      {/* Animated background with gradient mesh */}
+      <motion.div 
+        className="absolute inset-0 rounded-2xl overflow-hidden"
+        animate={{
+          background: vibe === 'bull' 
+            ? [
+                'radial-gradient(circle at 20% 20%, rgba(6,182,212,0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(16,185,129,0.2), transparent 50%)',
+                'radial-gradient(circle at 80% 20%, rgba(6,182,212,0.3), transparent 50%), radial-gradient(circle at 20% 80%, rgba(16,185,129,0.2), transparent 50%)',
+                'radial-gradient(circle at 20% 20%, rgba(6,182,212,0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(16,185,129,0.2), transparent 50%)'
+              ]
+            : [
+                'radial-gradient(circle at 20% 20%, rgba(239,68,68,0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(249,115,22,0.2), transparent 50%)',
+                'radial-gradient(circle at 80% 20%, rgba(239,68,68,0.3), transparent 50%), radial-gradient(circle at 20% 80%, rgba(249,115,22,0.2), transparent 50%)',
+                'radial-gradient(circle at 20% 20%, rgba(239,68,68,0.3), transparent 50%), radial-gradient(circle at 80% 80%, rgba(249,115,22,0.2), transparent 50%)'
+              ]
+        }}
+        transition={{ duration: 8, repeat: Infinity }}
+      />
+      
+      {/* Grid overlay */}
+      <div 
+        className="absolute inset-0 opacity-10"
+        style={{
+          backgroundImage: `linear-gradient(${vibe === 'bull' ? '#06b6d4' : '#ef4444'} 1px, transparent 1px),
+                           linear-gradient(90deg, ${vibe === 'bull' ? '#06b6d4' : '#ef4444'} 1px, transparent 1px)`,
+          backgroundSize: '20px 20px',
+        }}
+      />
+      
+      {/* Glow border effect */}
+      <motion.div
+        className="absolute inset-0 rounded-2xl"
+        animate={{
+          boxShadow: vibe === 'bull' 
+            ? 'inset 0 0 40px rgba(6,182,212,0.4), 0 0 40px rgba(6,182,212,0.3)'
+            : 'inset 0 0 40px rgba(239,68,68,0.4), 0 0 40px rgba(239,68,68,0.3)'
+        }}
+      />
+      
+      {/* New Trading Visualization */}
+      <TradingVisualization mode={vibe} />
+    </motion.div>
+  );
+};
+
+// Enhanced Floating Particles with dynamic movement
+const FloatingParticles: React.FC = () => {
+  return (
+    <>
+      {[...Array(20)].map((_, i) => (
         <motion.div
           key={i}
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: `${height}%`, opacity: 1 }}
-          transition={{ duration: 0.8, delay: i * 0.1, ease: "easeOut" }}
-          className={`relative w-2 sm:w-8 rounded-sm shadow-2xl ${direction === 'bull'
-            ? 'bg-green-500 shadow-green-500/50'
-            : 'bg-red-500 shadow-red-500/50'
-            }`}
-        >
-          {/* Wick */}
-          <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-px sm:w-0.5 ${direction === 'bull' ? 'bg-green-400' : 'bg-red-400'
-            }`} style={{ height: '120%' }} />
-          <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-px sm:w-0.5 ${direction === 'bull' ? 'bg-green-400' : 'bg-red-400'
-            }`} style={{ height: '120%' }} />
-        </motion.div>
+          className="absolute rounded-full opacity-30 pointer-events-none"
+          style={{
+            width: Math.random() * 25 + 5,
+            height: Math.random() * 25 + 5,
+            background: i % 4 === 0 
+              ? 'radial-gradient(circle, rgba(6,182,212,0.8), transparent)' 
+              : i % 4 === 1 
+                ? 'radial-gradient(circle, rgba(239,68,68,0.8), transparent)' 
+                : i % 4 === 2
+                  ? 'radial-gradient(circle, rgba(255,213,79,0.8), transparent)'
+                  : 'radial-gradient(circle, rgba(16,185,129,0.8), transparent)',
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+            filter: `blur(${Math.random() * 3 + 1}px)`,
+          }}
+          animate={{
+            y: [0, (Math.random() - 0.5) * 120, 0],
+            x: [0, (Math.random() - 0.5) * 120, 0],
+            scale: [1, Math.random() + 0.8, 1],
+            rotate: [0, Math.random() * 180, 360],
+          }}
+          transition={{
+            duration: Math.random() * 15 + 15,
+            repeat: Infinity,
+            ease: "easeInOut",
+            delay: Math.random() * 5
+          }}
+        />
       ))}
+    </>
+  );
+};
+
+// New Component: Animated Stats Counter
+const AnimatedCounter: React.FC<{ end: number; duration?: number; label: string }> = ({ 
+  end, 
+  duration = 2, 
+  label 
+}) => {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, threshold: 0.5 });
+
+  useEffect(() => {
+    if (inView) {
+      let start = 0;
+      const increment = end / (duration * 60);
+      const timer = setInterval(() => {
+        start += increment;
+        if (start >= end) {
+          setCount(end);
+          clearInterval(timer);
+        } else {
+          setCount(Math.ceil(start));
+        }
+      }, 1000 / 60);
+
+      return () => clearInterval(timer);
+    }
+  }, [inView, end, duration]);
+
+  return (
+    <div ref={ref} className="text-center">
+      <motion.div
+        initial={{ scale: 0.5, opacity: 0 }}
+        whileInView={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="text-3xl font-black text-brand-primary mb-2"
+      >
+        {count}+
+      </motion.div>
+      <div className="text-slate-600 font-medium">{label}</div>
     </div>
   );
 };
 
+// New Component: Interactive Feature Card
+const InteractiveFeatureCard: React.FC<{
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  delay?: number;
+}> = ({ icon: Icon, title, description, delay = 0 }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -10, scale: 1.02 }}
+      transition={{ duration: 0.5, delay }}
+      onHoverStart={() => setIsHovered(true)}
+      onHoverEnd={() => setIsHovered(false)}
+      className="bg-white p-8 rounded-2xl border border-slate-200 hover:border-brand-primary/30 hover:shadow-xl transition-all cursor-pointer group"
+    >
+      <motion.div
+        animate={{ 
+          scale: isHovered ? 1.1 : 1,
+          rotate: isHovered ? 5 : 0
+        }}
+        transition={{ duration: 0.3 }}
+        className="w-14 h-14 bg-brand-primary/10 rounded-xl flex items-center justify-center mb-6 group-hover:bg-brand-primary/20 transition-colors"
+      >
+        <Icon className="h-7 w-7 text-brand-primary" />
+      </motion.div>
+      
+      <h3 className="text-xl font-bold mb-3 group-hover:text-brand-primary transition-colors">
+        {title}
+      </h3>
+      
+      <p className="text-slate-600 leading-relaxed">
+        {description}
+      </p>
+      
+      {/* Animated underline on hover */}
+      <motion.div
+        initial={{ scaleX: 0 }}
+        animate={{ scaleX: isHovered ? 1 : 0 }}
+        transition={{ duration: 0.3 }}
+        className="h-0.5 bg-brand-primary mt-4 origin-left"
+      />
+    </motion.div>
+  );
+};
+
 const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier, onPlanSelection }) => {
-  const [showBear, setShowBear] = useState(false);
+  const [marketVibe, setMarketVibe] = useState<'bull' | 'bear'>('bull');
   const [subscriptionPlans, setSubscriptionPlans] = useState<SubscriptionPlan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
   const controls = useAnimation();
+  const mainRef = useRef<HTMLDivElement>(null);
 
   // Fetch subscription plans
   useEffect(() => {
@@ -50,505 +518,679 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier, onPlanSelection
       try {
         setLoadingPlans(true);
         const plans = await socialMediaService.getSubscriptionPlans();
-        if (plans && plans.length > 0) {
-          setSubscriptionPlans(plans);
-        } else {
-          // Don't show default plans if no plans exist in database
-          setSubscriptionPlans([]);
-        }
+        setSubscriptionPlans(plans ?? []);
       } catch (err) {
         console.error('Error fetching subscription plans:', err);
-        // Don't show default plans on error
         setSubscriptionPlans([]);
       } finally {
         setLoadingPlans(false);
       }
     };
-
     fetchPlans();
   }, []);
 
+  // Enhanced interval for market vibe toggle with smoother timing
   useEffect(() => {
     const interval = setInterval(() => {
-      setShowBear(prev => !prev);
-      controls.start({ scale: [1, 1.05, 1], transition: { duration: 0.6 } });
-    }, 5000);
+      setMarketVibe(prev => prev === 'bull' ? 'bear' : 'bull');
+      controls.start({ 
+        scale: [1, 1.03, 1], 
+        transition: { duration: 0.8, ease: 'easeInOut' } 
+      });
+    }, 6000);
     return () => clearInterval(interval);
   }, [controls]);
 
-  const fadeInUp = {
-    hidden: { opacity: 0, y: 40 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.8 } }
+  const sectionVariants: Variants = {
+    hidden: { opacity: 0, y: 60 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      transition: { 
+        duration: 0.8, 
+        staggerChildren: 0.3,
+        ease: "easeOut"
+      } 
+    }
+  };
+
+  const childVariants: Variants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      transition: { 
+        duration: 0.6,
+        ease: "easeOut"
+      } 
+    }
   };
 
   return (
     <>
-      <div className="min-h-screen bg-black text-white overflow-x-hidden relative font-sans">
-        {/* Animated Background Particles */}
-        <div className="fixed inset-0 pointer-events-none z-0">
-          {[...Array(30)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-1 h-1 bg-trade-neon rounded-full opacity-30"
-              initial={{
-                x: Math.random() * window.innerWidth,
-                y: -10
-              }}
-              animate={{
-                y: window.innerHeight + 10,
-                x: Math.random() * window.innerWidth
-              }}
-              transition={{
-                duration: 15 + Math.random() * 20,
-                repeat: Infinity,
-                ease: "linear"
-              }}
-            />
-          ))}
+      <div className="min-h-screen bg-white text-slate-900 overflow-x-hidden relative font-sans" ref={mainRef}>
+        {/* Enhanced floating particles with dynamic movement */}
+        <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+          <FloatingParticles />
         </div>
 
-        {/* Navbar */}
-        <nav className="fixed top-0 w-full z-50 bg-black/90 backdrop-blur-xl border-b border-white/10">
-          <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-5 flex justify-between items-center">
+        {/* Animated background grid */}
+        <div className="fixed inset-0 pointer-events-none z-0 opacity-[0.03]">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `linear-gradient(rgba(6,182,212,0.3) 1px, transparent 1px),
+                             linear-gradient(90deg, rgba(6,182,212,0.3) 1px, transparent 1px)`,
+            backgroundSize: '50px 50px',
+          }} />
+        </div>
+
+        {/* Enhanced Navbar with blur and scale animation */}
+        <motion.nav 
+          initial={{ y: -100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm"
+        >
+          <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center">
             <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="flex items-center space-x-2 sm:space-x-3"
+              whileHover={{ scale: 1.05 }}
+              className="flex items-center space-x-2 sm:space-x-3 cursor-pointer"
             >
-              <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-trade-neon animate-pulse" />
-              <span className="text-lg sm:text-xl md:text-2xl font-black tracking-tighter">
-                Mbauni <span className="text-trade-neon">Protocol</span>
+              <motion.div
+                animate={{ rotate: [0, 10, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <TrendingUp className="h-6 w-6 sm:h-7 sm:w-7 text-brand-primary" />
+              </motion.div>
+              <span className="text-lg sm:text-xl md:text-2xl font-black tracking-tighter bg-gradient-to-r from-slate-900 to-brand-primary bg-clip-text text-transparent">
+                Maichez<span className="text-brand-primary">Trades</span>
               </span>
             </motion.div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                // Login button should redirect to login page
-                onSelectTier('login');
-              }}
-              className="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-1.5 sm:px-6 sm:py-2 md:py-3 rounded-lg sm:rounded-xl font-bold backdrop-blur transition text-xs sm:text-sm md:text-base"
-            >
-              Login <ArrowRight className="inline h-3 w-3 sm:h-4 sm:w-4 ml-1" />
-            </motion.button>
-            
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                // Signup button should redirect to signup page
-                if (onPlanSelection) {
-                  onPlanSelection('signup');
-                } else {
-                  // Fallback to onSelectTier if onPlanSelection is not available
-                  onSelectTier('free');
-                }
-              }}
-              className="bg-trade-neon/10 hover:bg-trade-neon/20 border border-trade-neon/30 px-4 py-1.5 sm:px-6 sm:py-2 md:py-3 rounded-lg sm:rounded-xl font-bold backdrop-blur transition text-xs sm:text-sm md:text-base text-trade-neon"
-            >
-              Sign Up <ArrowRight className="inline h-3 w-3 sm:h-4 sm:w-4 ml-1" />
-            </motion.button>
+
+            <div className="flex items-center gap-3 sm:gap-4">
+              <motion.button
+                whileHover={{ 
+                  scale: 1.05, 
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  backgroundColor: '#f8fafc'
+                }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => onSelectTier('login')}
+                className="bg-slate-100 border border-slate-200 px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl font-semibold text-sm transition-all"
+              >
+                Login <ArrowRight className="inline h-4 w-4 ml-1" />
+              </motion.button>
+
+              <motion.button
+                whileHover={{ 
+                  scale: 1.05, 
+                  boxShadow: '0 4px 20px rgba(6,182,212,0.3)',
+                }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  if (onPlanSelection) {
+                    onPlanSelection('signup');
+                  } else {
+                    onSelectTier('free');
+                  }
+                }}
+                className="bg-gradient-to-r from-brand-primary to-cyan-500 text-white px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl font-bold text-sm transition-all relative overflow-hidden"
+              >
+                <span className="relative z-10">Get Started</span>
+                <motion.div
+                  className="absolute inset-0 bg-white/20"
+                  initial={{ x: '-100%' }}
+                  whileHover={{ x: '100%' }}
+                  transition={{ duration: 0.6 }}
+                />
+              </motion.button>
+            </div>
           </div>
-        </nav>
+        </motion.nav>
 
-        {/* Hero Section */}
+        {/* Enhanced Hero Section with parallax effects */}
         <header className="relative pt-24 sm:pt-32 pb-12 sm:pb-20 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-trade-neon/5 via-purple-900/10 to-black" />
-
+          {/* Animated background elements */}
           <motion.div
-            animate={controls}
-            className="container mx-auto px-4 sm:px-6 text-center relative z-10"
-          >
+            className="absolute inset-0 bg-gradient-to-br from-white via-slate-50/80 to-cyan-50/30"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.2 }}
+          />
+
+          <motion.div animate={controls} className="container mx-auto px-4 sm:px-6 text-center relative z-10">
+            {/* Enhanced badge with floating animation */}
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              className="inline-flex items-center gap-2 sm:gap-3 bg-trade-neon/10 border border-trade-neon/30 px-4 py-2 sm:px-6 sm:py-3 rounded-full mb-6 sm:mb-8"
+              initial={{ opacity: 0, y: 40, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.8, type: "spring", stiffness: 200 }}
+              className="inline-flex items-center gap-2 sm:gap-3 bg-gradient-to-r from-brand-primary/15 to-cyan-500/15 border border-brand-primary/30 px-4 py-2 sm:px-6 sm:py-3 rounded-full mb-6 sm:mb-8 shadow-lg backdrop-blur-sm relative overflow-hidden"
             >
-              <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-trade-neon animate-pulse" />
-              <span className="font-bold text-trade-neon tracking-wider text-xs sm:text-sm md:text-base">WELCOME TO WORLD OF PROBABILITIES</span>
+              <motion.div
+                animate={{ 
+                  scale: [1, 1.2, 1],
+                  rotate: [0, 5, -5, 0]
+                }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-brand-primary" />
+              </motion.div>
+              <span className="font-bold text-brand-primary tracking-wider text-xs sm:text-sm md:text-base bg-gradient-to-r from-brand-primary to-cyan-500 bg-clip-text text-transparent">
+                WELCOME TO NEXT-GEN TRADING
+              </span>
+              {/* Shine effect */}
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                initial={{ x: '-100%' }}
+                animate={{ x: '100%' }}
+                transition={{ duration: 2, repeat: Infinity, delay: 1 }}
+              />
             </motion.div>
 
-            <motion.h1
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black mb-6 sm:mb-8 leading-tight tracking-tight"
-            >
-              STOP <span className="text-red-500 line-through decoration-2 xs:decoration-3 sm:decoration-4 decoration-white">GAMBLING</span><br />
-              START <span className="text-trade-neon neon-text-shadow">DOMINATING</span>
-            </motion.h1>
+            {/* Enhanced main headline with staggered text animation */}
+            <div className="overflow-hidden">
+              <motion.h1
+                initial={{ opacity: 0, y: 60 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 1, delay: 0.2 }}
+                className="text-4xl xs:text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black mb-6 sm:mb-8 leading-tight tracking-tight"
+              >
+                <motion.span
+                  initial={{ opacity: 0, x: -50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="block"
+                >
+                  TRADE SMARTER
+                </motion.span>
+                <motion.span
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="block"
+                >
+                  <span className="text-red-500 line-through decoration-4 decoration-slate-300">GUESS</span>
+                  <span className="text-brand-primary ml-4">WIN</span>
+                </motion.span>
+              </motion.h1>
+            </div>
 
             <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
-              className="text-base sm:text-lg md:text-xl lg:text-2xl text-gray-300 mb-8 sm:mb-12 max-w-2xl sm:max-w-3xl md:max-w-4xl mx-auto leading-relaxed"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7, duration: 0.8 }}
+              className="text-lg sm:text-xl md:text-2xl text-slate-600 mb-8 sm:mb-12 max-w-2xl sm:max-w-3xl md:max-w-4xl mx-auto leading-relaxed"
             >
-              <span className="text-trade-neon font-bold">Probability-Driven Profits, AI-Guarded Capital</span><br />
-              Institutional strategies simplified. Every trade <span className="bg-trade-neon/20 px-1 py-0.5 sm:px-2 sm:py-1 rounded text-trade-neon font-bold">vetted by artificial intelligence</span>.
+              <span className="text-brand-primary font-bold">AI-powered signals, institutional risk management,</span> and mentorship that transforms retail traders into consistent performers.
             </motion.p>
 
+            {/* Enhanced Market Visualization Container */}
             <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
-              className="relative h-48 sm:h-64 mb-10 sm:mb-16 bg-black/50 backdrop-blur border border-white/10 rounded-2xl sm:rounded-3xl overflow-hidden max-w-2xl sm:max-w-3xl md:max-w-4xl mx-auto shadow-2xl"
+              initial={{ opacity: 0, y: 60, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.9, duration: 0.8 }}
+              className="relative h-52 sm:h-72 mb-10 sm:mb-16 bg-white/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl sm:rounded-3xl overflow-hidden max-w-2xl sm:max-w-3xl md:max-w-4xl mx-auto shadow-2xl hover:shadow-2xl transition-all"
             >
               <AnimatePresence mode="wait">
-                {!showBear ? (
-                  <motion.div
-                    key="bull"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-green-900/20 to-transparent"
-                  >
-                    <div className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-green-500 mb-3 sm:mb-4 animate-bounce">BULL MODE</div>
-                    <AnimatedCandles direction="bull" />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="bear"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-red-900/20 to-transparent"
-                  >
-                    <div className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-red-500 mb-3 sm:mb-4 animate-bounce">BEAR MODE</div>
-                    <AnimatedCandles direction="bear" />
-                  </motion.div>
-                )}
+                <motion.div
+                  key={marketVibe}
+                  initial={{ opacity: 0, scale: 1.1 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.7, ease: "easeInOut" }}
+                  className="absolute inset-0"
+                >
+                  <MarketVibeVisualization vibe={marketVibe} />
+                </motion.div>
               </AnimatePresence>
-              <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 text-[10px] xs:text-xs sm:text-sm text-gray-500">
-                Live Market Animation • Powered by CRT Logic
+              <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 text-xs sm:text-sm text-slate-400 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full border border-slate-200/60">
+                Live Market Vibe • Powered by Advanced AI
               </div>
             </motion.div>
 
-            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center">
+            {/* Enhanced CTA Buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 60 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.1, duration: 0.8 }}
+              className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center"
+            >
               <motion.button
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ 
+                  scale: 1.05, 
+                  boxShadow: '0 8px 30px rgba(6,182,212,0.3)',
+                }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => onSelectTier('signup')}
-                className="group relative px-6 sm:px-8 md:px-12 py-4 sm:py-5 md:py-6 bg-trade-neon text-black font-black text-base sm:text-lg md:text-xl rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl shadow-trade-neon/50 w-full sm:w-auto"
+                className="group relative px-8 sm:px-12 py-4 sm:py-5 bg-gradient-to-r from-brand-primary to-cyan-500 text-white font-black text-lg sm:text-xl rounded-2xl overflow-hidden shadow-2xl w-full sm:w-auto max-w-sm"
               >
-                <span className="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
-                  Join The Elite Mentorship <ArrowRight className="group-hover:translate-x-1 sm:group-hover:translate-x-2 transition h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="relative z-10 flex items-center justify-center gap-3">
+                  Start Trading Smarter 
+                  <motion.div
+                    animate={{ x: [0, 4, 0] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
+                    <Rocket className="h-5 w-5" />
+                  </motion.div>
                 </span>
-                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition duration-300" />
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-brand-primary"
+                  initial={{ x: '-100%' }}
+                  whileHover={{ x: '0%' }}
+                  transition={{ duration: 0.6 }}
+                />
               </motion.button>
 
               <motion.button
-                whileHover={{ scale: 1.05 }}
-                onClick={() => onSelectTier('signup')} // Redirect to signup page
-                className="px-6 sm:px-8 md:px-10 py-4 sm:py-5 md:py-6 border-2 border-trade-neon/50 text-trade-neon font-bold text-base sm:text-lg rounded-xl sm:rounded-2xl flex items-center justify-center gap-2 sm:gap-3 hover:bg-trade-neon/10 transition w-full sm:w-auto"
+                whileHover={{ 
+                  scale: 1.05, 
+                  boxShadow: '0 8px 30px rgba(0,0,0,0.1)',
+                  backgroundColor: '#f8fafc'
+                }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => onSelectTier('signup')}
+                className="px-8 sm:px-10 py-4 sm:py-5 border-2 border-brand-primary/40 text-brand-primary font-semibold text-lg rounded-2xl flex items-center justify-center gap-3 hover:bg-brand-primary/5 transition-all w-full sm:w-auto max-w-sm"
               >
-                <Play className="h-4 w-4 sm:h-6 sm:w-6" /> Watch Free Masterclass
+                <motion.div
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <Play className="h-5 w-5 fill-brand-primary" />
+                </motion.div>
+                Watch Free Masterclass
               </motion.button>
-            </div>
-
-
+            </motion.div>
           </motion.div>
         </header>
 
+        {/* New Stats Section */}
+        <motion.section
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          variants={sectionVariants}
+          className="py-16 sm:py-24 bg-slate-50/50"
+        >
+          <div className="container mx-auto px-4 sm:px-6">
+            <motion.div variants={childVariants} className="text-center mb-12 sm:mb-16">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black mb-4">
+                Trusted by <span className="text-brand-primary">Thousands</span> of Traders
+              </h2>
+              <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+                Join a community of successful traders who transformed their results with our proven methodology
+              </p>
+            </motion.div>
+
+            <motion.div 
+              variants={sectionVariants}
+              className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-4xl mx-auto"
+            >
+              <AnimatedCounter end={2500} label="Active Traders" />
+              <AnimatedCounter end={89} label="Success Rate" />
+              <AnimatedCounter end={15} label="Average ROI" />
+              <AnimatedCounter end={24} label="Support Hours" />
+            </motion.div>
+          </div>
+        </motion.section>
+
+        {/* Enhanced Features Section */}
+        <motion.section
+          variants={sectionVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          className="py-16 sm:py-24 bg-white"
+        >
+          <div className="container mx-auto px-4 sm:px-6">
+            <motion.div variants={childVariants} className="text-center mb-12 sm:mb-16">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black mb-4">
+                Why <span className="text-brand-primary">Maichez</span> Works
+              </h2>
+              <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+                We combine cutting-edge technology with proven trading principles to give you an unfair advantage
+              </p>
+            </motion.div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-7xl mx-auto">
+              <InteractiveFeatureCard
+                icon={Target}
+                title="Precision Signals"
+                description="AI-powered trade setups with exact entry, stop loss, and take profit levels based on institutional order flow."
+                delay={0.1}
+              />
+              <InteractiveFeatureCard
+                icon={Shield}
+                title="Risk Management"
+                description="Built-in risk controls and position sizing calculators to protect your capital and maximize returns."
+                delay={0.2}
+              />
+              <InteractiveFeatureCard
+                icon={Users}
+                title="Live Community"
+                description="Join thousands of traders in real-time discussions, mentorship sessions, and market analysis."
+                delay={0.3}
+              />
+              <InteractiveFeatureCard
+                icon={BarChart2}
+                title="Market Analytics"
+                description="Advanced market structure analysis, liquidity detection, and smart money concepts explained simply."
+                delay={0.4}
+              />
+              <InteractiveFeatureCard
+                icon={Clock}
+                title="24/7 Monitoring"
+                description="Our systems monitor global markets around the clock, alerting you to high-probability setups instantly."
+                delay={0.5}
+              />
+              <InteractiveFeatureCard
+                icon={Award}
+                title="Proven Results"
+                description="Join the 89% of our members who report improved consistency and profitability within 30 days."
+                delay={0.6}
+              />
+            </div>
+          </div>
+        </motion.section>
+
         {/* Pricing Section */}
-        <section className="py-12 sm:py-24 bg-black">
+        <motion.section
+          variants={sectionVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="py-16 sm:py-24 bg-white"
+        >
           <div className="container mx-auto px-4 sm:px-6">
             {subscriptionPlans.length > 0 && (
-              <div className="text-center mb-10 sm:mb-16">
-                <h2 className="text-2xl sm:text-3xl md:text-4xl font-black mb-3 sm:mb-4">Choose Your Transformation</h2>
-              </div>
+              <motion.div variants={childVariants} className="text-center mb-12 sm:mb-16">
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-black mb-4">Choose Your Track</h2>
+                <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+                  Select the plan that matches your trading goals and experience level
+                </p>
+              </motion.div>
             )}
 
             {loadingPlans ? (
               <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-trade-neon"></div>
+                <motion.div
+                  className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2"
+                  style={{ borderColor: 'var(--brand-primary)' }}
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                />
               </div>
             ) : subscriptionPlans.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-7xl mx-auto">
+              <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 max-w-7xl mx-auto" variants={sectionVariants}>
                 {subscriptionPlans.map((plan, index) => {
-                  // Determine styling based on plan position
                   const isPopular = plan.name === 'Professional';
                   const isElite = plan.name === 'Elite Mentorship';
                   const isFree = plan.name === 'Free Plan';
-                  
                   return (
-                    <div 
+                    <motion.div
                       key={plan.id}
-                      className={`bg-gray-900 border rounded-2xl sm:rounded-3xl p-6 sm:p-8 flex flex-col ${
-                        isPopular 
-                          ? 'border-2 border-trade-neon relative shadow-2xl shadow-trade-neon/20 md:my-0 my-4 md:scale-100 scale-[1.02]' 
-                          : isElite 
-                            ? 'border border-gray-800' 
-                            : 'border border-gray-800'
-                      }`}
+                      variants={childVariants}
+                      custom={index}
+                      className={`bg-slate-50 border rounded-2xl sm:rounded-3xl p-6 sm:p-8 flex flex-col ${isPopular ? 'border-2 border-brand-primary relative shadow-xl scale-105' : 'border border-slate-200'} hover:shadow-2xl transition-shadow`}
+                      whileHover={{ y: -5 }}
                     >
-                      {isPopular && (
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-trade-neon text-black font-bold px-3 py-1 sm:px-4 sm:py-1 rounded-full text-xs sm:text-sm">
-                          MOST POPULAR
-                        </div>
-                      )}
-                      
-                      <h3 className={`text-lg sm:text-xl font-bold mb-2 ${
-                        isElite ? 'text-purple-400' : isFree ? 'text-gray-400' : 'text-white'
-                      }`}>
-                        {plan.name}
-                      </h3>
-                      
-                      <div className={`text-3xl sm:text-4xl font-black mb-4 sm:mb-6 ${
-                        isPopular ? 'text-trade-neon' : isElite ? 'text-purple-400' : 'text-white'
-                      }`}>
+                      {isPopular && <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-brand-primary text-white font-bold px-3 py-1 sm:px-4 sm:py-1 rounded-full text-xs sm:text-sm shadow-md">MOST POPULAR</div>}
+
+                      <h3 className={`text-lg sm:text-xl font-bold mb-2 ${isElite ? 'text-violet-600' : isFree ? 'text-slate-500' : 'text-slate-900'}`}>{plan.name}</h3>
+
+                      <div className={`text-3xl sm:text-4xl font-black mb-4 sm:mb-6 ${isPopular ? 'text-brand-primary' : isElite ? 'text-violet-600' : 'text-slate-900'}`}>
                         ${plan.price}
                       </div>
-                      
+
                       <ul className="space-y-3 sm:space-y-4 mb-6 sm:mb-8 flex-1">
                         {plan.features.map((feature, idx) => (
-                          <li 
-                            key={idx} 
-                            className={`flex gap-2 sm:gap-3 ${
-                              isPopular || (isElite && idx === 0) 
-                                ? 'text-white' 
-                                : 'text-gray-300'
-                            }`}
-                          >
-                            <Check className={`h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0 ${
-                              isElite 
-                                ? 'text-purple-500' 
-                                : isPopular || (isFree && idx === 0)
-                                  ? 'text-trade-neon' 
-                                  : 'text-trade-neon'
-                            }`} /> 
-                            <span className={isPopular || (isElite && idx === 0) ? 'font-bold' : ''}>
-                              {feature}
-                            </span>
+                          <li key={idx} className={`flex gap-2 sm:gap-3 ${isPopular || (isElite && idx === 0) ? 'text-slate-900' : 'text-slate-600'}`}>
+                            <Check className={`h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0 ${isElite ? 'text-violet-500' : isPopular || (isFree && idx === 0) ? 'text-brand-primary' : 'text-brand-primary'}`} />
+                            <span className={isPopular || (isElite && idx === 0) ? 'font-bold' : ''}>{feature}</span>
                           </li>
                         ))}
                       </ul>
-                      
-                      <button 
+
+                      <motion.button
                         onClick={() => {
-                          // Use the new handler if available, otherwise fall back to the old one
                           if (onPlanSelection && plan.name) {
                             onPlanSelection(plan.name);
                           } else {
-                            // For all plans, redirect to signup page instead of application form
                             onSelectTier('signup');
                           }
                         }}
-                        className={`w-full py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold transition text-sm sm:text-base ${
-                          isPopular 
-                            ? 'bg-trade-neon text-black hover:bg-green-400' 
-                            : isElite 
-                              ? 'bg-purple-600 hover:bg-purple-500 text-white' 
-                              : 'border border-gray-600 hover:bg-gray-800 text-white'
-                        }`}
+                        whileHover={{ scale: 1.02 }}
+                        className={`w-full py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold transition text-sm sm:text-base ${isPopular ? 'bg-brand-primary text-white hover:brightness-95' : isElite ? 'bg-violet-600 hover:bg-violet-500 text-white' : 'border border-slate-200 hover:bg-slate-100 text-slate-900'}`}
                       >
                         {isFree ? 'Join for Free' : isElite ? 'Apply Now' : 'Get Started'}
-                      </button>
-                    </div>
+                      </motion.button>
+                    </motion.div>
                   );
                 })}
-              </div>
+              </motion.div>
             ) : (
-              // Show nothing when there are no subscription plans
               <div className="text-center py-12">
-                <p className="text-gray-500 text-lg"></p>
+                <p className="text-slate-400 text-lg">No plans available at the moment.</p>
               </div>
             )}
           </div>
-        </section>
+        </motion.section>
 
-        {/* Challenges & Achievements Section */}
-        <section className="py-6 sm:py-8 bg-gradient-to-r from-gray-900 to-black border-b border-gray-800">
+        {/* Why Traders Lose Section */}
+        <motion.section
+          variants={sectionVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="py-16 sm:py-24 bg-white border-t border-slate-100"
+        >
           <div className="container mx-auto px-4 sm:px-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 sm:gap-6">
-              <div className="bg-gray-800/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl text-center border border-gray-700 hover:border-trade-neon/50 transition">
-                <div className="text-trade-neon font-black text-lg sm:text-xl md:text-2xl">10{'>'}500</div>
-                <div className="text-gray-400 text-xs sm:text-sm mt-1">Completed</div>
-              </div>
-              <div className="bg-gray-800/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl text-center border border-gray-700 hover:border-trade-neon/50 transition">
-                <div className="text-trade-neon font-black text-lg sm:text-xl md:text-2xl">100{'>'}1000</div>
-                <div className="text-gray-400 text-xs sm:text-sm mt-1">Completed</div>
-              </div>
-              <div className="bg-gray-800/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl text-center border border-gray-700 hover:border-trade-neon/50 transition">
-                <div className="text-trade-neon font-black text-lg sm:text-xl md:text-2xl">20{'>'}1000</div>
-                <div className="text-gray-400 text-xs sm:text-sm mt-1">Completed</div>
-              </div>
-              <div className="bg-gray-800/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl text-center border border-gray-700 hover:border-trade-neon/50 transition">
-                <div className="text-trade-neon font-black text-lg sm:text-xl md:text-2xl">100{'>'}1500</div>
-                <div className="text-gray-400 text-xs sm:text-sm mt-1">Currently</div>
-              </div>
-              <div className="bg-gray-800/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl text-center border border-gray-700 hover:border-trade-neon/50 transition md:col-span-1 sm:col-span-3 col-span-2">
-                <div className="text-trade-neon font-black text-lg sm:text-xl md:text-2xl">787 Pips</div>
-                <div className="text-gray-400 text-xs sm:text-sm mt-1">Most Pips/Trade</div>
-              </div>
-            </div>
-            
-            <div className="text-center mt-4 sm:mt-6">
-              <p className="text-gray-400 text-xs sm:text-sm">Highest Drawdown: <span className="text-red-400 font-bold">$600</span> • And many more achievements!</p>
-            </div>
-          </div>
-        </section>
-
-        {/* Why Traders Fail Section */}
-        <section className="py-12 sm:py-20 bg-trade-dark border-t border-gray-800">
-          <div className="container mx-auto px-4 sm:px-6">
-            <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeInUp}
-              className="text-center mb-10 sm:mb-16"
-            >
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black mb-3 sm:mb-4">Why 90% of Traders <span className="text-red-500">Fail</span></h2>
-              <p className="text-base sm:text-xl text-gray-400">Most gurus teach indicators and hope. I teach <span className="text-white font-bold">Institutional Logic</span>.</p>
+            <motion.div variants={childVariants} className="text-center mb-12 sm:mb-16">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black mb-4">Why Traders Often <span className="text-red-500">Lose</span></h2>
+              <p className="text-lg text-slate-600">Many follow signals blindly. We teach <span className="text-slate-900 font-bold">institutional thinking</span> and repeatable process.</p>
             </motion.div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            <motion.div variants={sectionVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
               {[
-                { icon: AlertTriangle, title: "Retail Logic", desc: "Trading support & resistance lines that banks use to trap liquidity.", color: "text-red-500" },
-                { icon: Shield, title: "Institutional Logic", desc: "We trade WITH the banks, targeting liquidity sweeps & fair value gaps.", color: "text-trade-neon" },
-                { icon: TrendingUp, title: "Precision R:R", desc: "Minimum 1:3 Risk-to-Reward ratio enforced by our AI assistant.", color: "text-blue-400" }
+                { icon: AlertTriangle, title: "Retail Logic", desc: "Chasing indicator noise while liquidity does the heavy lifting.", color: "text-red-500" },
+                { icon: Shield, title: "Institutional Logic", desc: "We align with institutional flows: liquidity, structure, and order blocks.", color: "text-brand-primary" },
+                { icon: TrendingUp, title: "Precision R:R", desc: "Strict risk management (min 1:3) enforced by our AI guard.", color: "text-blue-400" }
               ].map((item, idx) => (
                 <motion.div
                   key={idx}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.2 }}
-                  className="bg-gray-900/50 p-6 sm:p-8 rounded-xl sm:rounded-2xl border border-gray-800 hover:border-trade-neon/30 transition"
+                  variants={childVariants}
+                  className="bg-white p-6 sm:p-8 rounded-xl sm:rounded-2xl border border-slate-100 hover:shadow-lg transition hover:bg-slate-50"
+                  whileHover={{ y: -8, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
                 >
                   <item.icon className={`h-8 w-8 sm:h-12 sm:w-12 ${item.color} mb-4 sm:mb-6`} />
                   <h3 className="text-xl sm:text-2xl font-bold mb-2 sm:mb-3">{item.title}</h3>
-                  <p className="text-gray-400 text-sm sm:text-base leading-relaxed">{item.desc}</p>
+                  <p className="text-slate-600 text-sm sm:text-base leading-relaxed">{item.desc}</p>
                 </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
-        </section>
+        </motion.section>
 
-        {/* AI Trade Guard Section */}
-        <section className="py-12 sm:py-24 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-black to-trade-dark/50" />
+        {/* AI Feature Section */}
+        <motion.section
+          variants={sectionVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="py-16 sm:py-24 relative overflow-hidden bg-slate-50"
+        >
           <div className="container mx-auto px-4 sm:px-6 relative z-10">
             <div className="flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-16">
-              <div className="lg:w-1/2">
-                <div className="inline-block bg-trade-neon text-black font-bold px-3 py-1 sm:px-4 sm:py-1 rounded-full mb-4 sm:mb-6 text-xs sm:text-sm">
-                  EXCLUSIVE TECHNOLOGY
-                </div>
-                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-                  The Only Program With An <span className="text-trade-neon">AI That Says "NO"</span>
-                </h2>
-                <p className="text-base sm:text-lg md:text-xl text-gray-400 mb-6 sm:mb-8">
-                  You paste your setup → AI runs my exact 6-point checklist.
+              <motion.div variants={childVariants} className="lg:w-1/2">
+                <div className="inline-block bg-brand-primary text-white font-bold px-3 py-1 sm:px-4 sm:py-1 rounded-full mb-4 sm:mb-6 text-xs sm:text-sm shadow-sm">EXCLUSIVE TECHNOLOGY</div>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black mb-4 sm:mb-6 leading-tight">The Program With An <span className="text-brand-primary">AI That Says "NO"</span></h2>
+                <p className="text-base sm:text-lg md:text-xl text-slate-600 mb-6 sm:mb-8">
+                  Paste your setup → AI runs a proven checklist.
                   <br /><br />
-                  <span className="text-green-400 font-bold">✅ Green Light:</span> Trade is valid. High probability.<br />
-                  <span className="text-red-500 font-bold">❌ Red Light:</span> STOP. You are about to lose money.
+                  <span className="text-green-600 font-bold">✅ Green Light:</span> High probability trade.<br />
+                  <span className="text-red-500 font-bold">❌ Red Light:</span> Stop and reassess.
                 </p>
-                <button
-                  onClick={() => onSelectTier('signup')} // Redirect to signup page
-                  className="bg-white text-black px-6 sm:px-8 py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold text-base sm:text-lg hover:bg-gray-200 transition flex items-center gap-2"
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  onClick={() => onSelectTier('signup')}
+                  className="bg-brand-primary text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold text-base sm:text-lg hover:brightness-95 transition flex items-center gap-2 shadow-md"
                 >
                   Try AI Trade Guard <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5" />
-                </button>
-              </div>
+                </motion.button>
+              </motion.div>
 
-              <div className="lg:w-1/2">
-                <div className="bg-gray-900 border border-gray-700 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-2xl shadow-trade-neon/10 transform rotate-1 sm:rotate-2 hover:rotate-0 transition duration-500">
-                  <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6 border-b border-gray-800 pb-3 sm:pb-4">
+              <motion.div
+                variants={childVariants}
+                className="lg:w-1/2"
+                initial={{ rotate: 2 }}
+                whileHover={{ rotate: 0 }}
+                transition={{ duration: 0.4 }}
+              >
+                <div className="bg-white border border-slate-100 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6 border-b border-slate-100 pb-3 sm:pb-4">
                     <div className="h-2 w-2 sm:h-3 sm:w-3 bg-green-500 rounded-full animate-pulse" />
                     <div className="font-bold text-sm sm:text-base">AI Analysis: EURUSD Buy Setup</div>
                   </div>
                   <div className="space-y-3 sm:space-y-4">
-                    <div className="flex items-start gap-2 sm:gap-3 text-green-400">
-                      <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> <span className="text-sm sm:text-base">Liquidity grabbed from PD Low</span>
-                    </div>
-                    <div className="flex items-start gap-2 sm:gap-3 text-green-400">
-                      <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> <span className="text-sm sm:text-base">Unmitigated FVG Identified</span>
-                    </div>
-                    <div className="flex items-start gap-2 sm:gap-3 text-green-400">
-                      <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> <span className="text-sm sm:text-base">Market Structure Shift (MSS) confirmed</span>
-                    </div>
-                    <div className="bg-green-500/10 border border-green-500/30 p-3 sm:p-4 rounded-lg mt-3 sm:mt-4">
-                      <p className="font-bold text-green-400 mb-1 text-sm sm:text-base">✅ TRADE APPROVED</p>
-                      <p className="text-xs sm:text-sm text-gray-300">All confluence factors met. Risk 1% and set TP at 1.0950.</p>
-                    </div>
+                    <motion.div initial={{ x: -20, opacity: 0 }} whileInView={{ x: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="flex items-start gap-2 sm:gap-3 text-green-600"><CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> <span className="text-sm sm:text-base">Liquidity grabbed from PD Low</span></motion.div>
+                    <motion.div initial={{ x: -20, opacity: 0 }} whileInView={{ x: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="flex items-start gap-2 sm:gap-3 text-green-600"><CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> <span className="text-sm sm:text-base">Unmitigated FVG Identified</span></motion.div>
+                    <motion.div initial={{ x: -20, opacity: 0 }} whileInView={{ x: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="flex items-start gap-2 sm:gap-3 text-green-600"><CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mt-0.5 flex-shrink-0" /> <span className="text-sm sm:text-base">Market Structure Shift (MSS) confirmed</span></motion.div>
+                    <motion.div initial={{ scale: 0.95, opacity: 0 }} whileInView={{ scale: 1, opacity: 1 }} transition={{ delay: 0.4 }} className="bg-green-500/10 border border-green-500/30 p-3 sm:p-4 rounded-lg mt-3 sm:mt-4">
+                      <p className="font-bold text-green-600 mb-1 text-sm sm:text-base">✅ TRADE APPROVED</p>
+                      <p className="text-xs sm:text-sm text-slate-500">All confluence factors met. Risk 1% and set TP at 1.0950.</p>
+                    </motion.div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </div>
           </div>
-        </section>
+        </motion.section>
 
-        {/* Testimonials */}
-        <section className="py-12 sm:py-20 bg-trade-dark border-t border-gray-800">
-          <div className="container mx-auto px-4 sm:px-6 text-center">
-            <h2 className="text-2xl sm:text-3xl font-black mb-8 sm:mb-12">Real Results from <span className="text-trade-neon">Real Students</span></h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {[
-                { name: "James K.", result: "Passed FTMO in 19 days", quote: "I was failing challenges for 2 years. Alex's FVG strategy clicked instantly." },
-                { name: "Sarah T.", result: "$27k Payout Last Month", quote: "The AI Assistant saved me from 5 losing trades last week alone. It pays for itself." },
-                { name: "Mike R.", result: "Quit 9-5 Job", quote: "This isn't just a course, it's a complete career change system. Forever grateful." }
-              ].map((t, i) => (
-                <div key={i} className="bg-black p-5 sm:p-6 rounded-xl sm:rounded-2xl border border-gray-800 text-left">
-                  <div className="flex text-yellow-500 mb-3 sm:mb-4"><Star className="fill-current h-3 w-3 sm:h-4 sm:w-4" /><Star className="fill-current h-3 w-3 sm:h-4 sm:w-4" /><Star className="fill-current h-3 w-3 sm:h-4 sm:w-4" /><Star className="fill-current h-3 w-3 sm:h-4 sm:w-4" /><Star className="fill-current h-3 w-3 sm:h-4 sm:w-4" /></div>
-                  <p className="text-gray-300 mb-4 sm:mb-6 italic text-sm sm:text-base">"{t.quote}"</p>
-                  <div>
-                    <div className="font-bold text-white text-sm sm:text-base">{t.name}</div>
-                    <div className="text-trade-neon text-xs sm:text-sm font-bold mt-1">{t.result}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Quick CTA Footer */}
+        {/* Enhanced CTA Section */}
         <motion.section
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
-          className="py-12 sm:py-24 bg-gradient-to-t from-trade-neon/10 to-black text-center border-t border-gray-900"
+          transition={{ duration: 1 }}
+          viewport={{ once: true }}
+          className="py-16 sm:py-24 bg-gradient-to-br from-slate-900 via-brand-primary/20 to-cyan-500/10 text-center relative overflow-hidden"
         >
-          <div className="container mx-auto px-4 sm:px-6">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black mb-4 sm:mb-6">This Is The Last Trading Course You'll Ever Buy</h2>
-            <p className="text-base sm:text-xl text-gray-400 mb-6 sm:mb-10">Because after the AI Trade Guard — you won’t need another one.</p>
+          {/* Animated background elements */}
+          <motion.div
+            className="absolute inset-0 opacity-10"
+            animate={{
+              backgroundPosition: ['0% 0%', '100% 100%'],
+            }}
+            transition={{
+              duration: 20,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+            style={{
+              backgroundImage: `radial-gradient(circle at 20% 80%, rgba(6,182,212,0.3) 0%, transparent 50%),
+                              radial-gradient(circle at 80% 20%, rgba(239,68,68,0.2) 0%, transparent 50%),
+                              radial-gradient(circle at 40% 40%, rgba(16,185,129,0.2) 0%, transparent 50%)`
+            }}
+          />
+          
+          <div className="container mx-auto px-4 sm:px-6 relative z-10">
+            <motion.h2
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black mb-6 text-white"
+            >
+              Ready to Transform Your Trading?
+            </motion.h2>
+            
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="text-lg sm:text-xl text-slate-200 mb-8 max-w-2xl mx-auto"
+            >
+              Join thousands of successful traders today. Limited spots available.
+            </motion.p>
 
             <motion.div
-              animate={{ y: [0, -8, 0] }}
-              transition={{ repeat: Infinity, duration: 2 }}
+              animate={{ 
+                y: [0, -10, 0],
+                scale: [1, 1.02, 1]
+              }}
+              transition={{ 
+                repeat: Infinity, 
+                duration: 2, 
+                ease: 'easeInOut' 
+              }}
+              className="flex flex-col sm:flex-row gap-4 justify-center items-center"
             >
-              <button
+              <motion.button
+                whileHover={{ 
+                  scale: 1.05,
+                  boxShadow: '0 10px 40px rgba(6,182,212,0.4)'
+                }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => onSelectTier('signup')}
-                className="px-6 sm:px-10 md:px-16 py-4 sm:py-5 md:py-6 sm:py-7 bg-trade-neon text-black text-lg sm:text-xl md:text-2xl font-black rounded-2xl sm:rounded-3xl shadow-2xl shadow-trade-neon/50 hover:shadow-trade-neon/70 transition w-full sm:w-auto max-w-md sm:max-w-lg mx-auto"
+                className="px-10 sm:px-16 py-5 sm:py-6 bg-gradient-to-r from-brand-primary to-cyan-500 text-white text-xl sm:text-2xl font-black rounded-2xl shadow-2xl hover:shadow-3xl transition-all relative overflow-hidden group"
               >
-                Secure Your Spot Before Price Increase <Lock className="inline ml-2 h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
-              </button>
+                <span className="relative z-10 flex items-center justify-center gap-3">
+                  Start Your Journey 
+                  <motion.div
+                    animate={{ rotate: [0, 360] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Sparkles className="h-6 w-6" />
+                  </motion.div>
+                </span>
+                
+                {/* Shimmer effect */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                  initial={{ x: '-100%' }}
+                  whileHover={{ x: '100%' }}
+                  transition={{ duration: 0.8 }}
+                />
+              </motion.button>
             </motion.div>
 
-            <div className="mt-10 sm:mt-16 text-gray-600 text-xs sm:text-sm">
-              &copy; 2025 Mbauni Protocol. All rights reserved. Trading involves risk.
-            </div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.5 }}
+              className="mt-12 text-slate-400 text-sm"
+            >
+              &copy; 2025 Maichez Trades. All rights reserved. Trading involves substantial risk.
+            </motion.div>
           </div>
         </motion.section>
       </div>
 
       <style>{`
         :root {
-          --trade-neon: #00ff94;
+          --brand-primary: #06b6d4;
+          --brand-accent: #ffd54f;
         }
-        .text-trade-neon { color: var(--trade-neon); }
-        .bg-trade-neon { background-color: var(--trade-neon); }
-        .neon-text-shadow { text-shadow: 0 0 10px rgba(0, 255, 148, 0.5); }
-  
-        /* Custom breakpoints */
-        @media (min-width: 475px) {
-          .xs\\:text-4xl {
-            font-size: 2.25rem;
-            line-height: 2.5rem;
-          }
-          
-          .xs\\:decoration-3 {
-            text-decoration-thickness: 3px;
-          }
+        .text-brand-primary { color: var(--brand-primary); }
+        .bg-brand-primary { background-color: var(--brand-primary); }
+        
+        /* Smooth scrolling */
+        html {
+          scroll-behavior: smooth;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+          width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+          background: #f1f5f9;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+          background: var(--brand-primary);
+          border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+          background: #0891b2;
         }
       `}</style>
     </>
