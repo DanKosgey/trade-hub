@@ -232,7 +232,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onBack, onSignupSuccess }) => {
           <h1 className="text-3xl font-black text-white tracking-tight mb-2">
             Create Account
           </h1>
-          <p className="text-gray-400">Join the Mbauni Protocol Community</p>
+          <p className="text-gray-400">Join the Maichez Trades Community</p>
         </div>
 
         <form onSubmit={handleSignup} className="space-y-5">

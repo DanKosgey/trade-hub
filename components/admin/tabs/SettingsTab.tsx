@@ -128,6 +128,11 @@ const SettingsTab: React.FC = () => {
   const handleCreatePlan = async (planData: any) => {
     setIsCreatingPlan(true);
     try {
+      // Format features properly
+      if (planData.features && typeof planData.features === 'string') {
+        planData.features = planData.features.split('\n').filter((f: string) => f.trim());
+      }
+      
       const newPlan = await socialMediaService.createSubscriptionPlan(planData);
       if (newPlan) {
         await fetchPlans(); // Refresh only the subscription plans

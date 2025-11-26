@@ -1,7 +1,7 @@
 # Community Enhancements Implementation Summary
 
 ## Overview
-This document summarizes the enhancements made to the community features of the Mbauni Protocol platform, including replacing Discord with Telegram, adding dynamic community link management, and implementing a comprehensive admin settings system.
+This document summarizes the enhancements made to the community features of the Maichez Trades platform, including replacing Discord with Telegram, adding dynamic community link management, and implementing a comprehensive admin settings system.
 
 ## Features Implemented
 

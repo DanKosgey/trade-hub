@@ -22,7 +22,8 @@ create policy "Users can view active community links"
 
 create policy "Admins can manage community links"
   on community_links for all
-  using ( exists (select 1 from profiles where id = auth.uid() and role = 'admin') );
+  using ( exists (select 1 from profiles where id = auth.uid() and role = 'admin') )
+  with check ( exists (select 1 from profiles where id = auth.uid() and role = 'admin') );
 
 -- Create indexes for better performance
 create index idx_community_links_active on community_links(is_active);

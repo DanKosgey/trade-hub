@@ -562,7 +562,8 @@ export const socialMediaService = {
       if (Array.isArray(plan.features)) {
         formattedFeatures = plan.features;
       } else if (typeof plan.features === 'string') {
-        formattedFeatures = (plan.features as string).split('\n').filter(f => f.trim());
+        // Handle empty string case properly
+        formattedFeatures = plan.features ? (plan.features as string).split('\n').filter(f => f.trim()) : [];
       }
       
       const { data, error } = await supabase
