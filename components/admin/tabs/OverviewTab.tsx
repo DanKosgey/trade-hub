@@ -6,7 +6,7 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from 'recharts';
 
 const OverviewTab: React.FC = () => {
-  const { students, pendingApplications, businessMetrics, trades, fetchBusinessMetrics, studentPenaltiesData, fetchStudentPenaltiesData, penaltyTrendsData, fetchPenaltyTrendsData } = useAdminPortal();
+  const { students, pendingApplications, businessMetrics, trades, fetchBusinessMetrics, studentPenaltiesData, fetchStudentPenaltiesData, penaltyTrendsData, fetchPenaltyTrendsData, setActiveTab } = useAdminPortal();
   
   // Fetch business metrics, student penalties, and penalty trends when component mounts
   useEffect(() => {
@@ -211,7 +211,7 @@ const OverviewTab: React.FC = () => {
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-6">
         {metrics.map((metric, index) => {
           const Icon = metric.icon;
           return (
@@ -229,6 +229,20 @@ const OverviewTab: React.FC = () => {
             </div>
           );
         })}
+        {/* Journal Trade Button */}
+        <div 
+          className="bg-gradient-to-br from-trade-neon to-blue-500 rounded-2xl border border-blue-500/50 p-6 shadow-xl hover:shadow-2xl transition-shadow cursor-pointer flex flex-col justify-center"
+          onClick={() => setActiveTab('journal')}
+        >
+          <div className="flex items-center gap-3 text-white mb-3">
+            <FileText className="h-5 w-5" />
+            <span className="text-sm font-medium">Trade Journal</span>
+          </div>
+          <div className="flex items-baseline justify-between">
+            <span className="text-lg font-bold text-white">Log Trades</span>
+            <span className="text-sm font-semibold text-white">→</span>
+          </div>
+        </div>
       </div>
 
       {/* P&L Breakdown Chart */}

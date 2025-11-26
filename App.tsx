@@ -102,397 +102,713 @@ const MOCK_USER_ELITE_PENDING: User = {
 
 // --- APP COMPONENT ---
 
-type AppViewState = 'landing' | 'login' | 'signup' | 'portal' | 'application';
+  type AppViewState = 'landing' | 'login' | 'signup' | 'portal' | 'application';
 
-const App: React.FC = () => {
-  // App Logic State
-  const [viewState, setViewState] = useState<AppViewState>('landing');
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [portalView, setPortalView] = useState('dashboard'); // Internal view within layout
-  const [activeLesson, setActiveLesson] = useState<CourseModule | null>(null);
-  const [lessonTab, setLessonTab] = useState<'content' | 'quiz'>('content');
+  const App: React.FC = () => {
+    // App Logic State
+    const [viewState, setViewState] = useState<AppViewState>('landing');
+    const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+    const [user, setUser] = useState<User | null>(null);
+    const [portalView, setPortalView] = useState('dashboard'); // Internal view within layout
+    const [activeLesson, setActiveLesson] = useState<CourseModule | null>(null);
+    const [lessonTab, setLessonTab] = useState<'content' | 'quiz'>('content');
 
-  // Data State
-  const [journalEntries, setJournalEntries] = useState<TradeEntry[]>(INITIAL_ENTRIES);
-  const [draftJournalEntry, setDraftJournalEntry] = useState<Partial<TradeEntry> | null>(null);
-  const [tradeRules, setTradeRules] = useState<TradeRule[]>(MOCK_RULES);
-  const [courses, setCourses] = useState<CourseModule[]>([]);
-  const [loadingCourses, setLoadingCourses] = useState(true);
+    // Data State
+    const [journalEntries, setJournalEntries] = useState<TradeEntry[]>(INITIAL_ENTRIES);
+    const [draftJournalEntry, setDraftJournalEntry] = useState<Partial<TradeEntry> | null>(null);
+    const [tradeRules, setTradeRules] = useState<TradeRule[]>(MOCK_RULES);
+    const [courses, setCourses] = useState<CourseModule[]>([]);
+    const [loadingCourses, setLoadingCourses] = useState(true);
 
-  // Fetch real courses data
-  useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        setLoadingCourses(true);
-        const courseModules = await courseService.getModules();
-        setCourses(courseModules);
-      } catch (error) {
-        console.error('Error fetching courses:', error);
-        // Fallback to mock data on error
-        const mockCourses: CourseModule[] = [
-          { id: '1', title: 'Market Structure & CRT', description: 'Understanding the foundation.', duration: '45m', level: 'beginner', completed: true, locked: false, contentType: 'video', content: 'https://www.youtube.com/embed/dQw4w9WgXcQ' },
-          {
-            id: '2', title: 'Fair Value Gaps Mastery', description: 'Identifying high probability gaps.', duration: '60m', level: 'intermediate', completed: false, locked: false, contentType: 'text', content: '## Fair Value Gaps\n\nAn FVG is a 3-candle pattern...',
-            quiz: {
-              id: 'q2',
-              passingScore: 70,
-              questions: [
-                { id: '2a', text: 'What is the minimum number of candles required to form an FVG?', options: ['2 Candles', '3 Candles', '5 Candles', '1 Candle'], correctOptionIndex: 1 },
-                { id: '2b', text: 'For a Bullish FVG, the gap exists between:', options: ['Candle 1 Low and Candle 3 High', 'Candle 1 High and Candle 3 Low', 'Candle 2 High and Candle 2 Low', 'None of the above'], correctOptionIndex: 1 },
-                { id: '2c', text: 'An FVG is considered "mitigated" when:', options: ['Price touches the gap', 'Price closes above the gap', 'Price never returns', 'The gap is too small'], correctOptionIndex: 0 },
-              ]
-            }
-          },
-          { id: '3', title: 'Liquidity Concepts', description: 'Where are the stops?', duration: '55m', level: 'intermediate', completed: false, locked: true, contentType: 'video' },
-          { id: '4', title: 'Advanced Executions', description: 'Precision entries.', duration: '90m', level: 'advanced', completed: false, locked: true, contentType: 'video' },
-        ];
-        setCourses(mockCourses);
-      } finally {
-        setLoadingCourses(false);
-      }
-    };
+    // Add event listener for custom navigation events
+    useEffect(() => {
+      const handleNavigate = (event: CustomEvent) => {
+        const view = event.detail;
+        if (view) {
+          setPortalView(view);
+        }
+      };
 
-    fetchCourses();
-  }, []);
+      window.addEventListener('navigateToView', handleNavigate as EventListener);
+      
+      return () => {
+        window.removeEventListener('navigateToView', handleNavigate as EventListener);
+      };
+    }, []);
 
-  // --- SUPABASE AUTH ---
-  React.useEffect(() => {
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetchProfile(session.user.id, session.user.email!);
-        setViewState('portal');
-      }
-    });
+    // Fetch real courses data
+    useEffect(() => {
+      const fetchCourses = async () => {
+        try {
+          setLoadingCourses(true);
+          const courseModules = await courseService.getModules();
+          setCourses(courseModules);
+        } catch (error) {
+          console.error('Error fetching courses:', error);
+          // Fallback to mock data on error
+          const mockCourses: CourseModule[] = [
+            { id: '1', title: 'Market Structure & CRT', description: 'Understanding the foundation.', duration: '45m', level: 'beginner', completed: true, locked: false, contentType: 'video', content: 'https://www.youtube.com/embed/dQw4w9WgXcQ' },
+            {
+              id: '2', title: 'Fair Value Gaps Mastery', description: 'Identifying high probability gaps.', duration: '60m', level: 'intermediate', completed: false, locked: false, contentType: 'text', content: '## Fair Value Gaps\n\nAn FVG is a 3-candle pattern...',
+              quiz: {
+                id: 'q2',
+                passingScore: 70,
+                questions: [
+                  { id: '2a', text: 'What is the minimum number of candles required to form an FVG?', options: ['2 Candles', '3 Candles', '5 Candles', '1 Candle'], correctOptionIndex: 1 },
+                  { id: '2b', text: 'For a Bullish FVG, the gap exists between:', options: ['Candle 1 Low and Candle 3 High', 'Candle 1 High and Candle 3 Low', 'Candle 2 High and Candle 2 Low', 'None of the above'], correctOptionIndex: 1 },
+                  { id: '2c', text: 'An FVG is considered "mitigated" when:', options: ['Price touches the gap', 'Price closes above the gap', 'Price never returns', 'The gap is too small'], correctOptionIndex: 0 },
+                ]
+              }
+            },
+            { id: '3', title: 'Liquidity Concepts', description: 'Where are the stops?', duration: '55m', level: 'intermediate', completed: false, locked: true, contentType: 'video' },
+            { id: '4', title: 'Advanced Executions', description: 'Precision entries.', duration: '90m', level: 'advanced', completed: false, locked: true, contentType: 'video' },
+          ];
+          setCourses(mockCourses);
+        } finally {
+          setLoadingCourses(false);
+        }
+      };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('Auth state changed:', _event, session);
-      if (session?.user) {
-        fetchProfile(session.user.id, session.user.email!);
-        // Only set view state to portal if we're not already in the middle of signup
-        if (viewState !== 'signup') {
+      fetchCourses();
+    }, []);
+
+    // --- SUPABASE AUTH ---
+    React.useEffect(() => {
+      // Check active session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          fetchProfile(session.user.id, session.user.email!);
           setViewState('portal');
         }
-      } else {
-        setUser(null);
-        if (viewState !== 'signup' && viewState !== 'login') {
-          setViewState('landing');
-        }
-      }
-    });
+      });
 
-    return () => subscription.unsubscribe();
-  }, [viewState]);
-
-  const fetchProfile = async (userId: string, email: string) => {
-    try {
-      console.log('Fetching profile for user:', userId);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error; // PGRST116 means no rows found, which we handle below
-
-      if (data) {
-        console.log('Profile found:', data);
-        setUser({
-          id: data.id,
-          name: data.full_name || email.split('@')[0],
-          email: email,
-          role: data.role as any,
-          subscriptionTier: data.subscription_tier as any,
-          progress: 0
-        });
-
-        // Set default view based on Role and Subscription Tier
-        if (data.role === 'admin') {
-          setPortalView('admin-dashboard');
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        console.log('Auth state changed:', _event, session);
+        if (session?.user) {
+          fetchProfile(session.user.id, session.user.email!);
+          // Only set view state to portal if we're not already in the middle of signup
+          if (viewState !== 'signup') {
+            setViewState('portal');
+          }
         } else {
-          // Redirect based on subscription tier
-          if (data.subscription_tier.includes('-pending')) {
-            setPortalView('dashboard'); // Will show under review page
-          } else if (data.subscription_tier === 'free') {
-            setPortalView('community');
-          } else {
-            setPortalView('dashboard');
+          setUser(null);
+          if (viewState !== 'signup' && viewState !== 'login') {
+            setViewState('landing');
           }
         }
-      } else {
-        console.log('No profile found for user, creating one:', userId);
-        // Create a default profile for the user
-        const { data: newProfile, error: insertError } = await supabase
+      });
+
+      return () => subscription.unsubscribe();
+    }, [viewState]);
+
+    const fetchProfile = async (userId: string, email: string) => {
+      try {
+        console.log('Fetching profile for user:', userId);
+        const { data, error } = await supabase
           .from('profiles')
-          .insert({
-            id: userId,
-            email: email,
-            full_name: email.split('@')[0],
-            subscription_tier: 'free',
-            role: 'student'
-          })
-          .select()
+          .select('*')
+          .eq('id', userId)
           .single();
 
-        if (insertError) throw insertError;
+        if (error && error.code !== 'PGRST116') throw error; // PGRST116 means no rows found, which we handle below
+
+        if (data) {
+          console.log('Profile found:', data);
+          setUser({
+            id: data.id,
+            name: data.full_name || email.split('@')[0],
+            email: email,
+            role: data.role as any,
+            subscriptionTier: data.subscription_tier as any,
+            progress: 0
+          });
+
+          // Set default view based on Role and Subscription Tier
+          if (data.role === 'admin') {
+            setPortalView('admin-dashboard');
+          } else {
+            // Redirect based on subscription tier
+            if (data.subscription_tier.includes('-pending')) {
+              setPortalView('dashboard'); // Will show under review page
+            } else if (data.subscription_tier === 'free') {
+              setPortalView('community');
+            } else {
+              setPortalView('dashboard');
+            }
+          }
+        } else {
+          console.log('No profile found for user, creating one:', userId);
+          // Create a default profile for the user
+          const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: userId,
+              email: email,
+              full_name: email.split('@')[0],
+              subscription_tier: 'free',
+              role: 'student'
+            })
+            .select()
+            .single();
+
+          if (insertError) throw insertError;
         
-        console.log('Profile created:', newProfile);
+          console.log('Profile created:', newProfile);
+          setUser({
+            id: newProfile.id,
+            name: newProfile.full_name || email.split('@')[0],
+            email: email,
+            role: newProfile.role as any,
+            subscriptionTier: newProfile.subscription_tier as any,
+            progress: 0
+          });
+        
+          // Set default view for new users
+          setPortalView('community');
+        }
+      } catch (error) {
+        console.error('Error fetching/creating profile:', error);
+        // Even if we can't fetch/create profile, still set a basic user object
         setUser({
-          id: newProfile.id,
-          name: newProfile.full_name || email.split('@')[0],
+          id: userId,
+          name: email.split('@')[0],
           email: email,
-          role: newProfile.role as any,
-          subscriptionTier: newProfile.subscription_tier as any,
+          role: 'student',
+          subscriptionTier: 'free',
           progress: 0
         });
-        
-        // Set default view for new users
         setPortalView('community');
       }
-    } catch (error) {
-      console.error('Error fetching/creating profile:', error);
-      // Even if we can't fetch/create profile, still set a basic user object
-      setUser({
-        id: userId,
-        name: email.split('@')[0],
-        email: email,
-        role: 'student',
-        subscriptionTier: 'free',
-        progress: 0
-      });
-      setPortalView('community');
-    }
-  };
+    };
 
-  // --- HANDLERS ---
+    // --- HANDLERS ---
 
-  const handleNavigationRequest = (tier: 'free' | 'foundation' | 'professional' | 'elite' | 'login' | 'signup') => {
-    if (tier === 'login') {
-      // Redirect to login page
-      setViewState('login');
-    } else if (tier === 'signup') {
-      // Redirect to signup page
-      setViewState('signup');
-    } else {
+    const handleNavigationRequest = (tier: 'free' | 'foundation' | 'professional' | 'elite' | 'login' | 'signup') => {
+      if (tier === 'login') {
+        // Redirect to login page
+        setViewState('login');
+      } else if (tier === 'signup') {
+        // Redirect to signup page
+        setViewState('signup');
+      } else {
+        // For all plans, redirect to signup page instead of application form
+        setViewState('signup');
+      }
+    };
+
+    const handlePlanSelection = (planName: string) => {
+      if (planName === 'signup') {
+        // Handle signup navigation
+        setViewState('signup');
+        return;
+      }
+    
       // For all plans, redirect to signup page instead of application form
       setViewState('signup');
-    }
-  };
-
-  const handlePlanSelection = (planName: string) => {
-    if (planName === 'signup') {
-      // Handle signup navigation
-      setViewState('signup');
-      return;
-    }
-    
-    // For all plans, redirect to signup page instead of application form
-    setViewState('signup');
-  };
-
-  const handleLogin = (loggedInUser: User) => {
-    setUser(loggedInUser);
-    setViewState('portal');
-
-    // Set default view based on Role
-    if (loggedInUser.role === 'admin') {
-      setPortalView('admin-dashboard');
-    } else {
-      setPortalView('dashboard');
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      // Check if there's an active session before attempting to sign out
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // Only attempt to sign out if there's an active session
-      if (session) {
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-          console.error('Error during logout:', error);
-          // Even if there's an error, still clear the user state and redirect
-        }
-      }
-      
-      // Clear user state and redirect regardless of session status
-      setUser(null);
-      setViewState('landing');
-      setPortalView('dashboard');
-    } catch (error) {
-      console.error('Unexpected error during logout:', error);
-      // Still clear the user state and redirect even if there's an unexpected error
-      setUser(null);
-      setViewState('landing');
-      setPortalView('dashboard');
-    }
-  };
-
-  const handleApplicationSubmit = (data: any) => {
-    // Set the user's subscription tier based on their selection
-    const subscriptionTier = data.subscriptionTier || 'free';
-    
-    const applicantUser: User = {
-      ...MOCK_USER_ELITE_PENDING,
-      name: data.fullName,
-      email: data.email,
-      subscriptionTier: subscriptionTier as any
     };
-    
-    // Auto-login as the pending user
-    setUser(applicantUser);
-    setViewState('portal');
-    
-    // If it's a free tier, redirect to community immediately
-    if (subscriptionTier === 'free' || subscriptionTier === 'foundation') {
-      setPortalView('community');
-    } else {
-      // For paid tiers, show under review page
-      setPortalView('dashboard'); // Will show under review page for elite-pending users
-    }
-  };
 
-  // Journal Handlers
-  const handleAddJournalEntry = (entry: TradeEntry) => {
-    setJournalEntries(prev => [entry, ...prev]);
-  };
+    const handleLogin = (loggedInUser: User) => {
+      setUser(loggedInUser);
+      setViewState('portal');
 
-  const handleLogTradeFromAI = (tradeData: Partial<TradeEntry>) => {
-    setDraftJournalEntry(tradeData);
-    setPortalView('journal');
-  };
-
-  // Rule Engine Handlers
-  const handleAddRule = (rule: TradeRule) => {
-    setTradeRules(prev => [...prev, rule]);
-  };
-
-  const handleUpdateRule = (id: string, updates: Partial<TradeRule>) => {
-    setTradeRules(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
-  };
-
-  const handleDeleteRule = (id: string) => {
-    setTradeRules(prev => prev.filter(r => r.id !== id));
-  };
-
-  const handleReorderRules = (newRules: TradeRule[]) => {
-    setTradeRules(newRules);
-  };
-
-  // Course Builder Handlers
-  const handleAddCourse = (module: CourseModule) => {
-    setCourses(prev => [...prev, module]);
-  };
-
-  const handleUpdateCourse = (id: string, updates: Partial<CourseModule>) => {
-    setCourses(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
-  };
-
-  const handleDeleteCourse = (id: string) => {
-    setCourses(prev => prev.filter(c => c.id !== id));
-  };
-
-  const handleStartLesson = (module: CourseModule) => {
-    setActiveLesson(module);
-    setLessonTab('content');
-    setPortalView('lesson');
-  };
-
-  const handleQuizCompletion = (moduleId: string, score: number, passed: boolean) => {
-    if (passed) {
-      handleUpdateCourse(moduleId, { completed: true });
-      // Optional: Show toast notification or celebration logic here
-    }
-  };
-
-  // --- RENDER LOGIC ---
-
-  if (viewState === 'landing') {
-    return <LandingPage 
-      onSelectTier={handleNavigationRequest} 
-      onPlanSelection={handlePlanSelection} 
-    />;
-  }
-
-  if (viewState === 'application') {
-    return (
-      <EliteApplicationForm
-        selectedPlan={selectedPlan}
-        onSubmit={handleApplicationSubmit}
-        onCancel={() => setViewState('landing')}
-      />
-    );
-  }
-
-  if (viewState === 'login') {
-    return (
-      <LoginPage
-        onBack={() => setViewState('landing')}
-      />
-    );
-  }
-
-  if (viewState === 'signup') {
-    return (
-      <SignupPage
-        onBack={() => setViewState('landing')}
-        onSignupSuccess={() => setViewState('portal')}
-      />
-    );
-  }
-
-  // Authenticated Portal View
-  if (user) {
-    const renderContent = () => {
-      // --- ACCESS CONTROL CHECK ---
-      if (user.role !== 'admin' && portalView.startsWith('admin-')) {
-        return (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-center animate-in fade-in zoom-in duration-300">
-            <div className="bg-red-500/10 p-6 rounded-full mb-6 border border-red-500/20">
-              <ShieldAlert className="h-12 w-12 text-red-500" />
-            </div>
-            <h2 className="text-3xl font-bold text-white mb-2">Unauthorized Access</h2>
-            <p className="text-gray-400 max-w-md mb-8">
-              You do not have permission to view this area. This incident has been logged.
-            </p>
-            <button
-              onClick={() => setPortalView('dashboard')}
-              className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold transition border border-gray-700"
-            >
-              Return to Dashboard
-            </button>
-          </div>
-        );
+      // Set default view based on Role
+      if (loggedInUser.role === 'admin') {
+        setPortalView('admin-dashboard');
+      } else {
+        setPortalView('dashboard');
       }
+    };
 
-      // --- ADMIN VIEWS ---
-      if (user.role === 'admin') {
-        switch (portalView) {
-          case 'admin-dashboard':
-          case 'admin-students':
-          case 'admin-trades':
-          case 'admin-analytics':
-          case 'settings':
-            return (
-              <AdminPortalProvider>
-                <AdminPortal courses={courses} user={user} />
-              </AdminPortalProvider>
-            );
-          case 'admin-rules':
-            return (
-              <div className="h-full">
-                <RuleBuilder
-                  userId={user.id}
-                  rules={tradeRules}
-                  onRulesChange={setTradeRules}
-                />
+    const handleLogout = async () => {
+      try {
+        // Check if there's an active session before attempting to sign out
+        const { data: { session } } = await supabase.auth.getSession();
+      
+        // Only attempt to sign out if there's an active session
+        if (session) {
+          const { error } = await supabase.auth.signOut();
+          if (error) {
+            console.error('Error during logout:', error);
+            // Even if there's an error, still clear the user state and redirect
+          }
+        }
+      
+        // Clear user state and redirect regardless of session status
+        setUser(null);
+        setViewState('landing');
+        setPortalView('dashboard');
+      } catch (error) {
+        console.error('Unexpected error during logout:', error);
+        // Still clear the user state and redirect even if there's an unexpected error
+        setUser(null);
+        setViewState('landing');
+        setPortalView('dashboard');
+      }
+    };
+
+    const handleApplicationSubmit = (data: any) => {
+      // Set the user's subscription tier based on their selection
+      const subscriptionTier = data.subscriptionTier || 'free';
+    
+      const applicantUser: User = {
+        ...MOCK_USER_ELITE_PENDING,
+        name: data.fullName,
+        email: data.email,
+        subscriptionTier: subscriptionTier as any
+      };
+    
+      // Auto-login as the pending user
+      setUser(applicantUser);
+      setViewState('portal');
+    
+      // If it's a free tier, redirect to community immediately
+      if (subscriptionTier === 'free' || subscriptionTier === 'foundation') {
+        setPortalView('community');
+      } else {
+        // For paid tiers, show under review page
+        setPortalView('dashboard'); // Will show under review page for elite-pending users
+      }
+    };
+
+    // Journal Handlers
+    const handleAddJournalEntry = (entry: TradeEntry) => {
+      setJournalEntries(prev => [entry, ...prev]);
+    };
+
+    const handleLogTradeFromAI = (tradeData: Partial<TradeEntry>) => {
+      setDraftJournalEntry(tradeData);
+      setPortalView('journal');
+    };
+
+    // Rule Engine Handlers
+    const handleAddRule = (rule: TradeRule) => {
+      setTradeRules(prev => [...prev, rule]);
+    };
+
+    const handleUpdateRule = (id: string, updates: Partial<TradeRule>) => {
+      setTradeRules(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+    };
+
+    const handleDeleteRule = (id: string) => {
+      setTradeRules(prev => prev.filter(r => r.id !== id));
+    };
+
+    const handleReorderRules = (newRules: TradeRule[]) => {
+      setTradeRules(newRules);
+    };
+
+    // Course Builder Handlers
+    const handleAddCourse = (module: CourseModule) => {
+      setCourses(prev => [...prev, module]);
+    };
+
+    const handleUpdateCourse = (id: string, updates: Partial<CourseModule>) => {
+      setCourses(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+    };
+
+    const handleDeleteCourse = (id: string) => {
+      setCourses(prev => prev.filter(c => c.id !== id));
+    };
+
+    const handleStartLesson = (module: CourseModule) => {
+      setActiveLesson(module);
+      setLessonTab('content');
+      setPortalView('lesson');
+    };
+
+    const handleQuizCompletion = (moduleId: string, score: number, passed: boolean) => {
+      if (passed) {
+        handleUpdateCourse(moduleId, { completed: true });
+        // Optional: Show toast notification or celebration logic here
+      }
+    };
+
+    // --- RENDER LOGIC ---
+
+    if (viewState === 'landing') {
+      return <LandingPage 
+        onSelectTier={handleNavigationRequest} 
+        onPlanSelection={handlePlanSelection} 
+      />;
+    }
+
+    if (viewState === 'application') {
+      return (
+        <EliteApplicationForm
+          selectedPlan={selectedPlan}
+          onSubmit={handleApplicationSubmit}
+          onCancel={() => setViewState('landing')}
+        />
+      );
+    }
+
+    if (viewState === 'login') {
+      return (
+        <LoginPage
+          onBack={() => setViewState('landing')}
+        />
+      );
+    }
+
+    if (viewState === 'signup') {
+      return (
+        <SignupPage
+          onBack={() => setViewState('landing')}
+          onSignupSuccess={() => setViewState('portal')}
+        />
+      );
+    }
+
+    // Authenticated Portal View
+    if (user) {
+      const renderContent = () => {
+        // --- ACCESS CONTROL CHECK ---
+        if (user.role !== 'admin' && portalView.startsWith('admin-')) {
+          return (
+            <div className="flex flex-col items-center justify-center h-[60vh] text-center animate-in fade-in zoom-in duration-300">
+              <div className="bg-red-500/10 p-6 rounded-full mb-6 border border-red-500/20">
+                <ShieldAlert className="h-12 w-12 text-red-500" />
               </div>
+              <h2 className="text-3xl font-bold text-white mb-2">Unauthorized Access</h2>
+              <p className="text-gray-400 max-w-md mb-8">
+                You do not have permission to view this area. This incident has been logged.
+              </p>
+              <button
+                onClick={() => setPortalView('dashboard')}
+                className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold transition border border-gray-700"
+              >
+                Return to Dashboard
+              </button>
+            </div>
+          );
+        }
+
+        // --- ADMIN VIEWS ---
+        if (user.role === 'admin') {
+          switch (portalView) {
+            case 'admin-dashboard':
+            case 'admin-students':
+            case 'admin-trades':
+            case 'admin-analytics':
+            case 'settings':
+              return (
+                <AdminPortalProvider>
+                  <AdminPortal courses={courses} user={user} />
+                </AdminPortalProvider>
+              );
+            case 'admin-rules':
+              return (
+                <div className="h-full">
+                  <RuleBuilder
+                    userId={user.id}
+                    rules={tradeRules}
+                    onRulesChange={setTradeRules}
+                  />
+                </div>
+              );
+            case 'admin-content':
+              // Map User to StudentProfile for CourseManagementSystem
+              const adminProfile: StudentProfile = {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                tier: user.subscriptionTier || 'foundation',
+                joinedDate: new Date().toISOString(),
+                stats: {
+                  winRate: 0,
+                  totalPnL: 0,
+                  tradesCount: 0,
+                  avgRiskReward: 0,
+                  currentDrawdown: 0
+                },
+                recentTrades: [],
+                status: 'active'
+              };
+            
+              return (
+                <CourseManagementSystem
+                  currentUser={adminProfile}
+                  isAdmin={true}
+                />
+              );
+            default:
+              // Check if it's an admin tab that should use AdminPortal
+              if (portalView.startsWith('admin-') || portalView === 'settings') {
+                return (
+                  <AdminPortalProvider>
+                    <AdminPortal courses={courses} user={user} />
+                  </AdminPortalProvider>
+                );
+              }
+            
+              return (
+                <div className="flex flex-col items-center justify-center h-[50vh] text-gray-500">
+                  <Settings className="h-12 w-12 mb-4 text-gray-700" />
+                  <h2 className="text-2xl font-bold mb-2 text-white">Module Under Construction</h2>
+                  <p>The {portalView} is being built by the engineering team.</p>
+                </div>
+              );
+          }
+        }
+
+        // --- STUDENT VIEWS ---
+        switch (portalView) {
+          case 'dashboard':
+            // Check if user is under review
+            if (user.subscriptionTier.includes('-pending')) {
+              return <UnderReviewPage userTier={user.subscriptionTier} onLogout={handleLogout} />;
+            }
+          
+            // For free users, redirect to community
+            if (user.subscriptionTier === 'free') {
+              setPortalView('community');
+              return <CommunityHub />;
+            }
+          
+            // For foundation and above, show dashboard
+            return (
+              <Dashboard
+                user={user}
+                courses={courses}
+                onContinueCourse={() => setPortalView('courses')}
+              />
             );
-          case 'admin-content':
+          case 'ai':
+            // Access Control: Only Professional and Elite tiers can access AI
+            // Pending users and free users cannot access
+            const hasAIAccess = (user.subscriptionTier === 'professional' || user.subscriptionTier === 'elite') && 
+                             !user.subscriptionTier.includes('-pending');
+
+            if (!hasAIAccess) {
+              // For users without access, show the professional feature message
+              return (
+                <div className="flex flex-col items-center justify-center h-[60vh] text-center max-w-lg mx-auto animate-in fade-in zoom-in duration-300">
+                  <div className="bg-gray-800 p-6 rounded-full mb-6 relative">
+                    <Lock className="h-12 w-12 mb-4 text-gray-500" />
+                    <div className="absolute -top-1 -right-1 bg-trade-neon/20 text-trade-neon text-xs font-bold px-2 py-1 rounded-full border border-trade-neon/50">PRO</div>
+                  </div>
+
+                  <h2 className="text-3xl font-bold text-white mb-4">Professional Feature</h2>
+
+                  {user.subscriptionTier.includes('-pending') ? (
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-xl text-yellow-200 max-w-md">
+                      <p className="font-bold mb-2 text-lg">Application Under Review</p>
+                      <p className="text-sm opacity-80">
+                        Your application for the {user.subscriptionTier.replace('-pending', '').charAt(0).toUpperCase() + user.subscriptionTier.replace('-pending', '').slice(1)} tier is currently being processed by our team.
+                        Access to the AI Assistant will be unlocked upon approval.
+                      </p>
+                    </div>
+                  ) : user.subscriptionTier === 'free' ? (
+                    <div className="bg-gray-800/50 border border-gray-700 p-6 rounded-xl text-gray-200 max-w-md">
+                      <p className="font-bold mb-2 text-lg">Free Tier Limitation</p>
+                      <p className="text-sm opacity-80">
+                        The AI Trade Assistant is exclusively available to <span className="text-trade-neon font-bold">Professional</span> and <span className="text-purple-500 font-bold">Elite</span> members.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-gray-400 mb-8 text-lg leading-relaxed">
+                        The AI Trade Assistant is exclusively available to <span className="text-trade-neon font-bold">Professional</span> and <span className="text-purple-500 font-bold">Elite</span> members.
+                      </p>
+
+                      <div className="space-y-3 w-full max-w-sm text-left">
+                        <div className="p-4 bg-gray-900 rounded-xl border border-gray-800 flex gap-4 items-center">
+                          <div className="bg-trade-neon/10 p-2 rounded-lg text-trade-neon"><Bot className="h-5 w-5" /></div>
+                          <div>
+                            <div className="text-white font-bold text-sm">AI Trade Guard</div>
+                            <p className="text-xs text-gray-500">Real-time setup validation</p>
+                          </div>
+                        </div>
+                        <div className="p-4 bg-gray-900 rounded-xl border border-gray-800 flex gap-4 items-center">
+                          <div className="bg-purple-500/10 p-2 rounded-lg text-purple-400"><BarChart className="h-5 w-5" /></div>
+                          <div>
+                            <div className="text-white font-bold text-sm">Advanced Analytics</div>
+                            <p className="text-xs text-gray-500">Performance breakdown by pair</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button className="mt-8 w-full max-w-sm py-4 bg-trade-neon text-black font-black text-lg rounded-xl hover:bg-green-400 transition shadow-lg shadow-trade-neon/20">
+                        Upgrade to Professional
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            }
+
+            // For users with access, render the AI Trade Assistant
+            return (
+              <AITradeAssistant
+                userId={user.id}
+                onLogTrade={handleLogTradeFromAI}
+              />
+            );
+          case 'journal':
+            // Access Control: Only foundation, professional, and elite tiers can access journals
+            // Pending users cannot access
+            const hasJournalAccess = (user.subscriptionTier === 'foundation' || 
+                                  user.subscriptionTier === 'professional' || 
+                                  user.subscriptionTier === 'elite') &&
+                                  !user.subscriptionTier.includes('-pending');
+
+            if (!hasJournalAccess) {
+              return (
+                <div className="flex flex-col items-center justify-center h-[60vh] text-center max-w-lg mx-auto animate-in fade-in zoom-in duration-300">
+                  <div className="bg-gray-800 p-6 rounded-full mb-6 relative">
+                    <Lock className="h-12 w-12 mb-4 text-gray-500" />
+                    <div className="absolute -top-1 -right-1 bg-trade-neon/20 text-trade-neon text-xs font-bold px-2 py-1 rounded-full border border-trade-neon/50">PRO</div>
+                  </div>
+
+                  <h2 className="text-3xl font-bold text-white mb-4">Premium Feature</h2>
+
+                  {user.subscriptionTier.includes('-pending') ? (
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-xl text-yellow-200 max-w-md">
+                      <p className="font-bold mb-2 text-lg">Application Under Review</p>
+                      <p className="text-sm opacity-80">
+                        Your application for the {user.subscriptionTier.replace('-pending', '').charAt(0).toUpperCase() + user.subscriptionTier.replace('-pending', '').slice(1)} tier is currently being processed by our team.
+                        Access to the Trade Journal will be unlocked upon approval.
+                      </p>
+                    </div>
+                  ) : user.subscriptionTier === 'free' ? (
+                    <div className="bg-gray-800/50 border border-gray-700 p-6 rounded-xl text-gray-200 max-w-md">
+                      <p className="font-bold mb-2 text-lg">Free Tier Limitation</p>
+                      <p className="text-sm opacity-80">
+                        The Trade Journal is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-gray-400 mb-8 text-lg leading-relaxed">
+                        The Trade Journal is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
+                      </p>
+
+                      <button 
+                        onClick={() => setPortalView('community')}
+                        className="mt-8 w-full max-w-sm py-4 bg-trade-neon text-black font-black text-lg rounded-xl hover:bg-green-400 transition shadow-lg shadow-trade-neon/20"
+                      >
+                        Back to Community
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <TradeJournal
+                user={user} // Add the missing user prop
+                entries={journalEntries}
+                onAddEntry={handleAddJournalEntry}
+                draftEntry={draftJournalEntry}
+                onClearDraft={() => setDraftJournalEntry(null)}
+              />
+            );
+          case 'todos':
+            // Access Control: Only foundation, professional, and elite tiers can access todos
+            // Pending users cannot access
+            const hasTodoAccess = (user.subscriptionTier === 'foundation' || 
+                               user.subscriptionTier === 'professional' || 
+                               user.subscriptionTier === 'elite') &&
+                               !user.subscriptionTier.includes('-pending');
+
+            if (!hasTodoAccess) {
+              return (
+                <div className="flex flex-col items-center justify-center h-[60vh] text-center max-w-lg mx-auto animate-in fade-in zoom-in duration-300">
+                  <div className="bg-gray-800 p-6 rounded-full mb-6 relative">
+                    <Lock className="h-12 w-12 mb-4 text-gray-500" />
+                    <div className="absolute -top-1 -right-1 bg-trade-neon/20 text-trade-neon text-xs font-bold px-2 py-1 rounded-full border border-trade-neon/50">PRO</div>
+                  </div>
+
+                  <h2 className="text-3xl font-bold text-white mb-4">Premium Feature</h2>
+
+                  {user.subscriptionTier.includes('-pending') ? (
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-xl text-yellow-200 max-w-md">
+                      <p className="font-bold mb-2 text-lg">Application Under Review</p>
+                      <p className="text-sm opacity-80">
+                        Your application for the {user.subscriptionTier.replace('-pending', '').charAt(0).toUpperCase() + user.subscriptionTier.replace('-pending', '').slice(1)} tier is currently being processed by our team.
+                        Access to the Task Manager will be unlocked upon approval.
+                      </p>
+                    </div>
+                  ) : user.subscriptionTier === 'free' ? (
+                    <div className="bg-gray-800/50 border border-gray-700 p-6 rounded-xl text-gray-200 max-w-md">
+                      <p className="font-bold mb-2 text-lg">Free Tier Limitation</p>
+                      <p className="text-sm opacity-80">
+                        The Task Manager is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-gray-400 mb-8 text-lg leading-relaxed">
+                        The Task Manager is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
+                      </p>
+
+                      <button 
+                        onClick={() => setPortalView('community')}
+                        className="mt-8 w-full max-w-sm py-4 bg-trade-neon text-black font-black text-lg rounded-xl hover:bg-green-400 transition shadow-lg shadow-trade-neon/20"
+                      >
+                        Back to Community
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            }
+
+            return <TodoList userId={user.id} />;
+          case 'courses':
+            // Access Control: Only foundation, professional, and elite tiers can access courses
+            // Pending users cannot access
+            const hasCourseAccess = (user.subscriptionTier === 'foundation' || 
+                                 user.subscriptionTier === 'professional' || 
+                                 user.subscriptionTier === 'elite') &&
+                                 !user.subscriptionTier.includes('-pending');
+
+            if (!hasCourseAccess) {
+              return (
+                <div className="flex flex-col items-center justify-center h-[60vh] text-center max-w-lg mx-auto animate-in fade-in zoom-in duration-300">
+                  <div className="bg-gray-800 p-6 rounded-full mb-6 relative">
+                    <Lock className="h-12 w-12 mb-4 text-gray-500" />
+                    <div className="absolute -top-1 -right-1 bg-trade-neon/20 text-trade-neon text-xs font-bold px-2 py-1 rounded-full border border-trade-neon/50">PRO</div>
+                  </div>
+
+                  <h2 className="text-3xl font-bold text-white mb-4">Premium Feature</h2>
+
+                  {user.subscriptionTier.includes('-pending') ? (
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-xl text-yellow-200 max-w-md">
+                      <p className="font-bold mb-2 text-lg">Application Under Review</p>
+                      <p className="text-sm opacity-80">
+                        Your application for the {user.subscriptionTier.replace('-pending', '').charAt(0).toUpperCase() + user.subscriptionTier.replace('-pending', '').slice(1)} tier is currently being processed by our team.
+                        Access to the Course Curriculum will be unlocked upon approval.
+                      </p>
+                    </div>
+                  ) : user.subscriptionTier === 'free' ? (
+                    <div className="bg-gray-800/50 border border-gray-700 p-6 rounded-xl text-gray-200 max-w-md">
+                      <p className="font-bold mb-2 text-lg">Free Tier Limitation</p>
+                      <p className="text-sm opacity-80">
+                        The Course Curriculum is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-gray-400 mb-8 text-lg leading-relaxed">
+                        The Course Curriculum is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
+                      </p>
+
+                      <button 
+                        onClick={() => setPortalView('community')}
+                        className="mt-8 w-full max-w-sm py-4 bg-trade-neon text-black font-black text-lg rounded-xl hover:bg-green-400 transition shadow-lg shadow-trade-neon/20"
+                      >
+                        Back to Community
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            }
+
             // Map User to StudentProfile for CourseManagementSystem
-            const adminProfile: StudentProfile = {
+            const studentProfile: StudentProfile = {
               id: user.id,
               name: user.name,
               email: user.email,
@@ -508,494 +824,194 @@ const App: React.FC = () => {
               recentTrades: [],
               status: 'active'
             };
-            
+          
             return (
               <CourseManagementSystem
-                currentUser={adminProfile}
-                isAdmin={true}
+                currentUser={studentProfile}
+                isAdmin={false}
               />
             );
-          default:
-            // Check if it's an admin tab that should use AdminPortal
-            if (portalView.startsWith('admin-') || portalView === 'settings') {
-              return (
-                <AdminPortalProvider>
-                  <AdminPortal courses={courses} user={user} />
-                </AdminPortalProvider>
-              );
-            }
-            
+
+          case 'lesson':
+            if (!activeLesson) return <div>Lesson not found</div>;
+
             return (
-              <div className="flex flex-col items-center justify-center h-[50vh] text-gray-500">
-                <Settings className="h-12 w-12 mb-4 text-gray-700" />
-                <h2 className="text-2xl font-bold mb-2 text-white">Module Under Construction</h2>
-                <p>The {portalView} is being built by the engineering team.</p>
-              </div>
-            );
-        }
-      }
-
-      // --- STUDENT VIEWS ---
-      switch (portalView) {
-        case 'dashboard':
-          // Check if user is under review
-          if (user.subscriptionTier.includes('-pending')) {
-            return <UnderReviewPage userTier={user.subscriptionTier} onLogout={handleLogout} />;
-          }
-          
-          // For free users, redirect to community
-          if (user.subscriptionTier === 'free') {
-            setPortalView('community');
-            return <CommunityHub />;
-          }
-          
-          // For foundation and above, show dashboard
-          return (
-            <Dashboard
-              user={user}
-              courses={courses}
-              onContinueCourse={() => setPortalView('courses')}
-            />
-          );
-        case 'ai':
-          // Access Control: Only Professional and Elite tiers can access AI
-          // Pending users and free users cannot access
-          const hasAIAccess = (user.subscriptionTier === 'professional' || user.subscriptionTier === 'elite') && 
-                             !user.subscriptionTier.includes('-pending');
-
-          if (!hasAIAccess) {
-            // For users without access, show the professional feature message
-            return (
-              <div className="flex flex-col items-center justify-center h-[60vh] text-center max-w-lg mx-auto animate-in fade-in zoom-in duration-300">
-                <div className="bg-gray-800 p-6 rounded-full mb-6 relative">
-                  <Lock className="h-12 w-12 mb-4 text-gray-500" />
-                  <div className="absolute -top-1 -right-1 bg-trade-neon/20 text-trade-neon text-xs font-bold px-2 py-1 rounded-full border border-trade-neon/50">PRO</div>
-                </div>
-
-                <h2 className="text-3xl font-bold text-white mb-4">Professional Feature</h2>
-
-                {user.subscriptionTier.includes('-pending') ? (
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-xl text-yellow-200 max-w-md">
-                    <p className="font-bold mb-2 text-lg">Application Under Review</p>
-                    <p className="text-sm opacity-80">
-                      Your application for the {user.subscriptionTier.replace('-pending', '').charAt(0).toUpperCase() + user.subscriptionTier.replace('-pending', '').slice(1)} tier is currently being processed by our team.
-                      Access to the AI Assistant will be unlocked upon approval.
-                    </p>
-                  </div>
-                ) : user.subscriptionTier === 'free' ? (
-                  <div className="bg-gray-800/50 border border-gray-700 p-6 rounded-xl text-gray-200 max-w-md">
-                    <p className="font-bold mb-2 text-lg">Free Tier Limitation</p>
-                    <p className="text-sm opacity-80">
-                      The AI Trade Assistant is exclusively available to <span className="text-trade-neon font-bold">Professional</span> and <span className="text-purple-500 font-bold">Elite</span> members.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-gray-400 mb-8 text-lg leading-relaxed">
-                      The AI Trade Assistant is exclusively available to <span className="text-trade-neon font-bold">Professional</span> and <span className="text-purple-500 font-bold">Elite</span> members.
-                    </p>
-
-                    <div className="space-y-3 w-full max-w-sm text-left">
-                      <div className="p-4 bg-gray-900 rounded-xl border border-gray-800 flex gap-4 items-center">
-                        <div className="bg-trade-neon/10 p-2 rounded-lg text-trade-neon"><Bot className="h-5 w-5" /></div>
-                        <div>
-                          <div className="text-white font-bold text-sm">AI Trade Guard</div>
-                          <p className="text-xs text-gray-500">Real-time setup validation</p>
-                        </div>
-                      </div>
-                      <div className="p-4 bg-gray-900 rounded-xl border border-gray-800 flex gap-4 items-center">
-                        <div className="bg-purple-500/10 p-2 rounded-lg text-purple-400"><BarChart className="h-5 w-5" /></div>
-                        <div>
-                          <div className="text-white font-bold text-sm">Advanced Analytics</div>
-                          <p className="text-xs text-gray-500">Performance breakdown by pair</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button className="mt-8 w-full max-w-sm py-4 bg-trade-neon text-black font-black text-lg rounded-xl hover:bg-green-400 transition shadow-lg shadow-trade-neon/20">
-                      Upgrade to Professional
-                    </button>
-                  </>
-                )}
-              </div>
-            );
-          }
-
-          // For users with access, render the AI Trade Assistant
-          return (
-            <AITradeAssistant
-              userId={user.id}
-              onLogTrade={handleLogTradeFromAI}
-            />
-          );
-        case 'journal':
-          // Access Control: Only foundation, professional, and elite tiers can access journals
-          // Pending users cannot access
-          const hasJournalAccess = (user.subscriptionTier === 'foundation' || 
-                                  user.subscriptionTier === 'professional' || 
-                                  user.subscriptionTier === 'elite') &&
-                                  !user.subscriptionTier.includes('-pending');
-
-          if (!hasJournalAccess) {
-            return (
-              <div className="flex flex-col items-center justify-center h-[60vh] text-center max-w-lg mx-auto animate-in fade-in zoom-in duration-300">
-                <div className="bg-gray-800 p-6 rounded-full mb-6 relative">
-                  <Lock className="h-12 w-12 mb-4 text-gray-500" />
-                  <div className="absolute -top-1 -right-1 bg-trade-neon/20 text-trade-neon text-xs font-bold px-2 py-1 rounded-full border border-trade-neon/50">PRO</div>
-                </div>
-
-                <h2 className="text-3xl font-bold text-white mb-4">Premium Feature</h2>
-
-                {user.subscriptionTier.includes('-pending') ? (
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-xl text-yellow-200 max-w-md">
-                    <p className="font-bold mb-2 text-lg">Application Under Review</p>
-                    <p className="text-sm opacity-80">
-                      Your application for the {user.subscriptionTier.replace('-pending', '').charAt(0).toUpperCase() + user.subscriptionTier.replace('-pending', '').slice(1)} tier is currently being processed by our team.
-                      Access to the Trade Journal will be unlocked upon approval.
-                    </p>
-                  </div>
-                ) : user.subscriptionTier === 'free' ? (
-                  <div className="bg-gray-800/50 border border-gray-700 p-6 rounded-xl text-gray-200 max-w-md">
-                    <p className="font-bold mb-2 text-lg">Free Tier Limitation</p>
-                    <p className="text-sm opacity-80">
-                      The Trade Journal is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-gray-400 mb-8 text-lg leading-relaxed">
-                      The Trade Journal is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
-                    </p>
-
-                    <button 
-                      onClick={() => setPortalView('community')}
-                      className="mt-8 w-full max-w-sm py-4 bg-trade-neon text-black font-black text-lg rounded-xl hover:bg-green-400 transition shadow-lg shadow-trade-neon/20"
-                    >
-                      Back to Community
-                    </button>
-                  </>
-                )}
-              </div>
-            );
-          }
-
-          return (
-            <TradeJournal
-              user={user} // Add the missing user prop
-              entries={journalEntries}
-              onAddEntry={handleAddJournalEntry}
-              draftEntry={draftJournalEntry}
-              onClearDraft={() => setDraftJournalEntry(null)}
-            />
-          );
-        case 'todos':
-          // Access Control: Only foundation, professional, and elite tiers can access todos
-          // Pending users cannot access
-          const hasTodoAccess = (user.subscriptionTier === 'foundation' || 
-                               user.subscriptionTier === 'professional' || 
-                               user.subscriptionTier === 'elite') &&
-                               !user.subscriptionTier.includes('-pending');
-
-          if (!hasTodoAccess) {
-            return (
-              <div className="flex flex-col items-center justify-center h-[60vh] text-center max-w-lg mx-auto animate-in fade-in zoom-in duration-300">
-                <div className="bg-gray-800 p-6 rounded-full mb-6 relative">
-                  <Lock className="h-12 w-12 mb-4 text-gray-500" />
-                  <div className="absolute -top-1 -right-1 bg-trade-neon/20 text-trade-neon text-xs font-bold px-2 py-1 rounded-full border border-trade-neon/50">PRO</div>
-                </div>
-
-                <h2 className="text-3xl font-bold text-white mb-4">Premium Feature</h2>
-
-                {user.subscriptionTier.includes('-pending') ? (
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-xl text-yellow-200 max-w-md">
-                    <p className="font-bold mb-2 text-lg">Application Under Review</p>
-                    <p className="text-sm opacity-80">
-                      Your application for the {user.subscriptionTier.replace('-pending', '').charAt(0).toUpperCase() + user.subscriptionTier.replace('-pending', '').slice(1)} tier is currently being processed by our team.
-                      Access to the Task Manager will be unlocked upon approval.
-                    </p>
-                  </div>
-                ) : user.subscriptionTier === 'free' ? (
-                  <div className="bg-gray-800/50 border border-gray-700 p-6 rounded-xl text-gray-200 max-w-md">
-                    <p className="font-bold mb-2 text-lg">Free Tier Limitation</p>
-                    <p className="text-sm opacity-80">
-                      The Task Manager is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-gray-400 mb-8 text-lg leading-relaxed">
-                      The Task Manager is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
-                    </p>
-
-                    <button 
-                      onClick={() => setPortalView('community')}
-                      className="mt-8 w-full max-w-sm py-4 bg-trade-neon text-black font-black text-lg rounded-xl hover:bg-green-400 transition shadow-lg shadow-trade-neon/20"
-                    >
-                      Back to Community
-                    </button>
-                  </>
-                )}
-              </div>
-            );
-          }
-
-          return <TodoList userId={user.id} />;
-        case 'courses':
-          // Access Control: Only foundation, professional, and elite tiers can access courses
-          // Pending users cannot access
-          const hasCourseAccess = (user.subscriptionTier === 'foundation' || 
-                                 user.subscriptionTier === 'professional' || 
-                                 user.subscriptionTier === 'elite') &&
-                                 !user.subscriptionTier.includes('-pending');
-
-          if (!hasCourseAccess) {
-            return (
-              <div className="flex flex-col items-center justify-center h-[60vh] text-center max-w-lg mx-auto animate-in fade-in zoom-in duration-300">
-                <div className="bg-gray-800 p-6 rounded-full mb-6 relative">
-                  <Lock className="h-12 w-12 mb-4 text-gray-500" />
-                  <div className="absolute -top-1 -right-1 bg-trade-neon/20 text-trade-neon text-xs font-bold px-2 py-1 rounded-full border border-trade-neon/50">PRO</div>
-                </div>
-
-                <h2 className="text-3xl font-bold text-white mb-4">Premium Feature</h2>
-
-                {user.subscriptionTier.includes('-pending') ? (
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 p-6 rounded-xl text-yellow-200 max-w-md">
-                    <p className="font-bold mb-2 text-lg">Application Under Review</p>
-                    <p className="text-sm opacity-80">
-                      Your application for the {user.subscriptionTier.replace('-pending', '').charAt(0).toUpperCase() + user.subscriptionTier.replace('-pending', '').slice(1)} tier is currently being processed by our team.
-                      Access to the Course Curriculum will be unlocked upon approval.
-                    </p>
-                  </div>
-                ) : user.subscriptionTier === 'free' ? (
-                  <div className="bg-gray-800/50 border border-gray-700 p-6 rounded-xl text-gray-200 max-w-md">
-                    <p className="font-bold mb-2 text-lg">Free Tier Limitation</p>
-                    <p className="text-sm opacity-80">
-                      The Course Curriculum is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-gray-400 mb-8 text-lg leading-relaxed">
-                      The Course Curriculum is exclusively available to <span className="text-trade-neon font-bold">Foundation</span> tier and above members.
-                    </p>
-
-                    <button 
-                      onClick={() => setPortalView('community')}
-                      className="mt-8 w-full max-w-sm py-4 bg-trade-neon text-black font-black text-lg rounded-xl hover:bg-green-400 transition shadow-lg shadow-trade-neon/20"
-                    >
-                      Back to Community
-                    </button>
-                  </>
-                )}
-              </div>
-            );
-          }
-
-          // Map User to StudentProfile for CourseManagementSystem
-          const studentProfile: StudentProfile = {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            tier: user.subscriptionTier || 'foundation',
-            joinedDate: new Date().toISOString(),
-            stats: {
-              winRate: 0,
-              totalPnL: 0,
-              tradesCount: 0,
-              avgRiskReward: 0,
-              currentDrawdown: 0
-            },
-            recentTrades: [],
-            status: 'active'
-          };
-          
-          return (
-            <CourseManagementSystem
-              currentUser={studentProfile}
-              isAdmin={false}
-            />
-          );
-
-        case 'lesson':
-          if (!activeLesson) return <div>Lesson not found</div>;
-
-          return (
-            <div className="max-w-4xl mx-auto text-white pb-10">
-              <button
-                onClick={() => setPortalView('courses')}
-                className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition"
-              >
-                ← Back to Curriculum
-              </button>
-
-              <div className="flex items-center gap-4 mb-6 border-b border-gray-800">
+              <div className="max-w-4xl mx-auto text-white pb-10">
                 <button
-                  onClick={() => setLessonTab('content')}
-                  className={`px-4 py-3 font-bold text-sm border-b-2 transition ${lessonTab === 'content'
-                    ? 'border-trade-accent text-white'
-                    : 'border-transparent text-gray-500 hover:text-gray-300'
-                    }`}
+                  onClick={() => setPortalView('courses')}
+                  className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition"
                 >
-                  Lesson Content
+                  ← Back to Curriculum
                 </button>
-                {activeLesson.quiz && (
+
+                <div className="flex items-center gap-4 mb-6 border-b border-gray-800">
                   <button
-                    onClick={() => setLessonTab('quiz')}
-                    className={`px-4 py-3 font-bold text-sm border-b-2 transition flex items-center gap-2 ${lessonTab === 'quiz'
+                    onClick={() => setLessonTab('content')}
+                    className={`px-4 py-3 font-bold text-sm border-b-2 transition ${lessonTab === 'content'
                       ? 'border-trade-accent text-white'
                       : 'border-transparent text-gray-500 hover:text-gray-300'
                       }`}
                   >
-                    <CheckSquare className="h-4 w-4" /> Quiz
+                    Lesson Content
                   </button>
-                )}
-              </div>
-
-              <div className="bg-black border border-gray-800 rounded-2xl overflow-hidden shadow-2xl mb-8 min-h-[500px]">
-                {lessonTab === 'content' ? (
-                  <>
-                    {activeLesson.contentType === 'video' ? (
-                      <div className="aspect-video bg-gray-900">
-                        {/* Function to convert YouTube URLs to embed format */}
-                        {(() => {
-                          const getEmbedUrl = (url: string | undefined) => {
-                            if (!url) return null;
-                            
-                            // Handle YouTube URLs
-                            if (url.includes('youtube.com/watch')) {
-                              const videoId = url.split('v=')[1]?.split('&')[0];
-                              if (videoId) {
-                                return `https://www.youtube.com/embed/${videoId}`;
-                              }
-                            } else if (url.includes('youtu.be/')) {
-                              const videoId = url.split('youtu.be/')[1]?.split('?')[0];
-                              if (videoId) {
-                                return `https://www.youtube.com/embed/${videoId}`;
-                              }
-                            }
-                            
-                            // Return the original URL if it's already an embed URL or not a YouTube URL
-                            return url.includes('embed') || !url.includes('youtube.com') ? url : null;
-                          };
-                          
-                          const embedUrl = getEmbedUrl(activeLesson.content);
-                          
-                          return embedUrl ? (
-                            <iframe
-                              src={embedUrl}
-                              title={activeLesson.title}
-                              className="w-full h-full"
-                              frameBorder="0"
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                              allowFullScreen
-                            />
-                          ) : activeLesson.content ? (
-                            <div className="w-full h-full flex items-center justify-center p-6">
-                              <div className="text-center">
-                                <PlayCircle className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                                <h3 className="text-xl font-bold text-gray-400 mb-2">Unable to Embed Video</h3>
-                                <p className="text-gray-500 mb-4">This video cannot be embedded. Please use a direct embed URL.</p>
-                                <p className="text-sm text-gray-600 bg-gray-800 p-3 rounded-lg break-words">{activeLesson.content}</p>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <div className="text-center">
-                                <PlayCircle className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                                <p className="text-gray-500">No video content available</p>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    ) : (
-                      <div className="p-12 bg-trade-dark min-h-[400px]">
-                        <h2 className="text-3xl font-bold mb-8">{activeLesson.title}</h2>
-                        <div className="prose prose-invert max-w-none">
-                          {/* Simple markdown-like rendering for demo */}
-                          {activeLesson.content?.split('\n').map((line, i) => {
-                            if (line.startsWith('# ')) return <h1 key={i} className="text-2xl font-bold mb-4 text-white">{line.substring(2)}</h1>;
-                            if (line.startsWith('## ')) return <h2 key={i} className="text-xl font-bold mb-3 text-white mt-8">{line.substring(3)}</h2>;
-                            if (line.trim() === '') return <br key={i} />;
-                            return <p key={i} className="text-gray-300 leading-relaxed mb-4">{line}</p>;
-                          })}
-                          {!activeLesson.content && (
-                            <div className="text-center text-gray-500 py-10">
-                              <div className="mb-4">No text content available for this module.</div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="p-8 bg-trade-dark h-full">
-                    {activeLesson.quiz ? (
-                      <QuizPlayer
-                        quiz={activeLesson.quiz}
-                        onComplete={(score, passed) => handleQuizCompletion(activeLesson.id, score, passed)}
-                        onRetake={() => { }}
-                      />
-                    ) : (
-                      <div className="text-center p-12 text-gray-500">No quiz available for this module.</div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {lessonTab === 'content' && (
-                <div className="flex justify-between items-center bg-trade-dark p-6 rounded-xl border border-gray-800">
-                  <div>
-                    <h3 className="font-bold text-lg mb-1">Lesson Complete?</h3>
-                    <p className="text-sm text-gray-400">
-                      {activeLesson.quiz ? "Take the quiz to complete this module." : "Mark this module as finished to unlock the next chapter."}
-                    </p>
-                  </div>
-                  {activeLesson.quiz ? (
+                  {activeLesson.quiz && (
                     <button
                       onClick={() => setLessonTab('quiz')}
-                      className="px-8 py-3 bg-trade-accent hover:bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-900/20 transition flex items-center gap-2"
+                      className={`px-4 py-3 font-bold text-sm border-b-2 transition flex items-center gap-2 ${lessonTab === 'quiz'
+                        ? 'border-trade-accent text-white'
+                        : 'border-transparent text-gray-500 hover:text-gray-300'
+                        }`}
                     >
-                      Proceed to Quiz <ArrowRight className="h-5 w-5" />
-                    </button>
-                  ) : (
-                    <button className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-900/20 transition flex items-center gap-2">
-                      Complete & Continue →
+                      <CheckSquare className="h-4 w-4" /> Quiz
                     </button>
                   )}
                 </div>
-              )}
-            </div>
-          );
 
-        case 'community':
-          return <CommunityHub />;
-        default:
-          return <div>View Not Found</div>;
-      }
-    };
+                <div className="bg-black border border-gray-800 rounded-2xl overflow-hidden shadow-2xl mb-8 min-h-[500px]">
+                  {lessonTab === 'content' ? (
+                    <>
+                      {activeLesson.contentType === 'video' ? (
+                        <div className="aspect-video bg-gray-900">
+                          {/* Function to convert YouTube URLs to embed format */}
+                          {(() => {
+                            const getEmbedUrl = (url: string | undefined) => {
+                              if (!url) return null;
+                            
+                              // Handle YouTube URLs
+                              if (url.includes('youtube.com/watch')) {
+                                const videoId = url.split('v=')[1]?.split('&')[0];
+                                if (videoId) {
+                                  return `https://www.youtube.com/embed/${videoId}`;
+                                }
+                              } else if (url.includes('youtu.be/')) {
+                                const videoId = url.split('youtu.be/')[1]?.split('?')[0];
+                                if (videoId) {
+                                  return `https://www.youtube.com/embed/${videoId}`;
+                                }
+                              }
+                            
+                              // Return the original URL if it's already an embed URL or not a YouTube URL
+                              return url.includes('embed') || !url.includes('youtube.com') ? url : null;
+                            };
+                          
+                            const embedUrl = getEmbedUrl(activeLesson.content);
+                          
+                            return embedUrl ? (
+                              <iframe
+                                src={embedUrl}
+                                title={activeLesson.title}
+                                className="w-full h-full"
+                                frameBorder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                              />
+                            ) : activeLesson.content ? (
+                              <div className="w-full h-full flex items-center justify-center p-6">
+                                <div className="text-center">
+                                  <PlayCircle className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                                  <h3 className="text-xl font-bold text-gray-400 mb-2">Unable to Embed Video</h3>
+                                  <p className="text-gray-500 mb-4">This video cannot be embedded. Please use a direct embed URL.</p>
+                                  <p className="text-sm text-gray-600 bg-gray-800 p-3 rounded-lg break-words">{activeLesson.content}</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <div className="text-center">
+                                  <PlayCircle className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                                  <p className="text-gray-500">No video content available</p>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      ) : (
+                        <div className="p-12 bg-trade-dark min-h-[400px]">
+                          <h2 className="text-3xl font-bold mb-8">{activeLesson.title}</h2>
+                          <div className="prose prose-invert max-w-none">
+                            {/* Simple markdown-like rendering for demo */}
+                            {activeLesson.content?.split('\n').map((line, i) => {
+                              if (line.startsWith('# ')) return <h1 key={i} className="text-2xl font-bold mb-4 text-white">{line.substring(2)}</h1>;
+                              if (line.startsWith('## ')) return <h2 key={i} className="text-xl font-bold mb-3 text-white mt-8">{line.substring(3)}</h2>;
+                              if (line.trim() === '') return <br key={i} />;
+                              return <p key={i} className="text-gray-300 leading-relaxed mb-4">{line}</p>;
+                            })}
+                            {!activeLesson.content && (
+                              <div className="text-center text-gray-500 py-10">
+                                <div className="mb-4">No text content available for this module.</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="p-8 bg-trade-dark h-full">
+                      {activeLesson.quiz ? (
+                        <QuizPlayer
+                          quiz={activeLesson.quiz}
+                          onComplete={(score, passed) => handleQuizCompletion(activeLesson.id, score, passed)}
+                          onRetake={() => { }}
+                        />
+                      ) : (
+                        <div className="text-center p-12 text-gray-500">No quiz available for this module.</div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-    return (
-      <Layout
-        user={user}
-        currentView={portalView}
-        onChangeView={setPortalView}
-        onLogout={handleLogout}
-      >
-        <main className="flex-1 p-8">
-          {loadingCourses ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-trade-neon"></div>
-            </div>
-          ) : (
-            renderContent()
-          )}
-        </main>
-      </Layout>
-    );
-  }
+                {lessonTab === 'content' && (
+                  <div className="flex justify-between items-center bg-trade-dark p-6 rounded-xl border border-gray-800">
+                    <div>
+                      <h3 className="font-bold text-lg mb-1">Lesson Complete?</h3>
+                      <p className="text-sm text-gray-400">
+                        {activeLesson.quiz ? "Take the quiz to complete this module." : "Mark this module as finished to unlock the next chapter."}
+                      </p>
+                    </div>
+                    {activeLesson.quiz ? (
+                      <button
+                        onClick={() => setLessonTab('quiz')}
+                        className="px-8 py-3 bg-trade-accent hover:bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-900/20 transition flex items-center gap-2"
+                      >
+                        Proceed to Quiz <ArrowRight className="h-5 w-5" />
+                      </button>
+                    ) : (
+                      <button className="px-8 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg shadow-green-900/20 transition flex items-center gap-2">
+                        Complete & Continue →
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
 
-  return null; // Should not reach here
-};
+          case 'community':
+            return <CommunityHub />;
+          default:
+            return <div>View Not Found</div>;
+        }
+      };
 
-export default App;
+      return (
+        <Layout
+          user={user}
+          currentView={portalView}
+          onChangeView={setPortalView}
+          onLogout={handleLogout}
+        >
+          <main className="flex-1 p-8">
+            {loadingCourses ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-trade-neon"></div>
+              </div>
+            ) : (
+              renderContent()
+            )}
+          </main>
+        </Layout>
+      );
+    }
+
+    return null; // Should not reach here
+  };
+
+  export default App;

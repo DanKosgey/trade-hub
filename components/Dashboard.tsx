@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { User, CourseModule, TradeEntry } from '../types';
-import { PlayCircle, Award, TrendingUp, Clock, CalendarPlus, CheckCircle, AlertTriangle, Activity, DollarSign, TrendingDown, Percent } from 'lucide-react';
+import { PlayCircle, Award, TrendingUp, Clock, CalendarPlus, CheckCircle, AlertTriangle, Activity, DollarSign, TrendingDown, Percent, BookOpen } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, 
   AreaChart, Area, CartesianGrid 
@@ -350,12 +350,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, courses, onContinueCourse }
               <p className="text-xs text-gray-500 mt-1">Target: &gt; 2.0</p>
             </div>
             
-            {/* Continue Action */}
-            <div className="bg-gradient-to-br from-trade-accent to-blue-700 p-5 md:p-6 rounded-xl border border-blue-500 shadow-lg shadow-blue-900/20 cursor-pointer hover:scale-[1.02] transition flex flex-col justify-center" onClick={onContinueCourse}>
-              <h3 className="font-bold text-lg mb-1 text-white">Continue Learning</h3>
-              <p className="text-blue-100 text-sm mb-4 opacity-80">Next: Liquidity Concepts</p>
+            {/* Journal Trade Button */}
+            <div 
+              className="bg-gradient-to-br from-trade-accent to-blue-700 p-5 md:p-6 rounded-xl border border-blue-500 shadow-lg shadow-blue-900/20 cursor-pointer hover:scale-[1.02] transition flex flex-col justify-center"
+              onClick={() => window.dispatchEvent(new CustomEvent('navigateToView', { detail: 'journal' }))}
+            >
+              <h3 className="font-bold text-lg mb-1 text-white">Trade Journal</h3>
+              <p className="text-blue-100 text-sm mb-4 opacity-80">Log your trades</p>
               <div className="flex items-center text-white font-bold text-sm bg-white/20 w-fit px-3 py-2 rounded-lg hover:bg-white/30 transition">
-                Resume Module <PlayCircle className="ml-2 h-4 w-4" />
+                Log Trade <BookOpen className="ml-2 h-4 w-4" />
               </div>
             </div>
           </div>
