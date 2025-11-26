@@ -620,30 +620,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier, onPlanSelection
               >
                 Login <ArrowRight className="inline h-4 w-4 ml-1" />
               </motion.button>
-
-              <motion.button
-                whileHover={{ 
-                  scale: 1.05, 
-                  boxShadow: '0 4px 20px rgba(6,182,212,0.3)',
-                }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  if (onPlanSelection) {
-                    onPlanSelection('signup');
-                  } else {
-                    onSelectTier('free');
-                  }
-                }}
-                className="bg-gradient-to-r from-brand-primary to-cyan-500 text-white px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl font-bold text-sm transition-all relative overflow-hidden"
-              >
-                <span className="relative z-10">Get Started</span>
-                <motion.div
-                  className="absolute inset-0 bg-white/20"
-                  initial={{ x: '-100%' }}
-                  whileHover={{ x: '100%' }}
-                  transition={{ duration: 0.6 }}
-                />
-              </motion.button>
             </div>
           </div>
         </motion.nav>
@@ -779,25 +755,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier, onPlanSelection
                   whileHover={{ x: '0%' }}
                   transition={{ duration: 0.6 }}
                 />
-              </motion.button>
-
-              <motion.button
-                whileHover={{ 
-                  scale: 1.05, 
-                  boxShadow: '0 8px 30px rgba(0,0,0,0.1)',
-                  backgroundColor: '#1e293b'
-                }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => onSelectTier('signup')}
-                className="px-8 sm:px-10 py-4 sm:py-5 border-2 border-slate-700 text-white font-semibold text-lg rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-800 transition-all w-full sm:w-auto max-w-sm"
-              >
-                <motion.div
-                  animate={{ scale: [1, 1.1, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  <Play className="h-5 w-5 fill-white" />
-                </motion.div>
-                Watch Free Masterclass
               </motion.button>
             </motion.div>
           </motion.div>
