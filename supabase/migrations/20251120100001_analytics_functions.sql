@@ -20,7 +20,7 @@ begin
     group by date_trunc('month', p.joined_date)
     order by date_trunc('month', p.joined_date);
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create a function to get course completion data for analytics
 create or replace function get_course_completion_data()
@@ -47,7 +47,7 @@ begin
     group by cm.id, cm.title
     order by cm.id;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create a function to get rule violations data for analytics
 create or replace function get_rule_violations_data()
@@ -66,7 +66,7 @@ begin
     order by violation_count desc
     limit 10;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create a function to get comprehensive analytics data
 create or replace function get_comprehensive_analytics()
@@ -135,4 +135,4 @@ begin
             select id from profiles where role = 'student'
         )), 0) as total_pnl;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;

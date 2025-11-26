@@ -117,7 +117,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onBack }) => {
           </h1>
           <p className="text-gray-400">
             {showPasswordLogin 
-              ? 'Access the Maichez Trades Terminal' 
+              ? 'Access the Mbauni Protocol Terminal' 
               : 'Enter your email to receive a login code'}
           </p>
         </div>

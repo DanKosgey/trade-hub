@@ -62,7 +62,7 @@ begin
     where cl.is_active = true
     order by cl.sort_order;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Add a column to track user's last selected community platform
 alter table profiles add column if not exists last_community_platform text;

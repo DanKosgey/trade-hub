@@ -80,7 +80,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView, on
         <div className="p-6 border-b border-gray-800 hidden md:block">
           <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
             <span className={`w-2 h-6 rounded-sm ${user.role === 'admin' ? 'bg-purple-500' : 'bg-trade-accent'}`}></span>
-            {user.role === 'admin' ? 'Admin Portal' : 'Maichez Trades'}
+            {user.role === 'admin' ? 'Admin Portal' : 'Mbauni Protocol'}
           </h1>
         </div>
         

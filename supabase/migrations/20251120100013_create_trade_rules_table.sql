@@ -155,7 +155,7 @@ begin
     and ur.is_active = true
     order by tr.order_number asc;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create a function to log rule changes
 create or replace function log_rule_change(
@@ -169,4 +169,4 @@ begin
     insert into rule_audit_log (rule_id, action, old_values, new_values, changed_by)
     values (rule_id, action, old_vals, new_vals, changed_by);
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;

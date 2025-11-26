@@ -54,7 +54,7 @@ begin
   
   return new_course_id;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create a function to get all versions of a course
 create or replace function get_course_versions(course_id uuid)
@@ -90,7 +90,7 @@ begin
   where ct.root_id = (select id from courses where id = course_id or parent_id = course_id limit 1)
   order by ct.version;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create policies for versioned courses
 create policy "Users can view all versions of courses."

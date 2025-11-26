@@ -106,7 +106,7 @@ begin
     end loop;
   end if;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create a function to create module update notifications
 create or replace function create_module_update_notification(
@@ -145,7 +145,7 @@ begin
     end loop;
   end if;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create a function to get unread notifications count for a user
 create or replace function get_unread_notifications_count(user_id uuid)
@@ -159,7 +159,7 @@ begin
   
   return count_var;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Insert default notification preferences for existing users
 insert into notification_preferences (profile_id)

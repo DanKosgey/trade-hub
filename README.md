@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Maichez Trades - Trade Hub
+# Mbauni Protocol - Trade Hub
 
 An AI-powered educational platform focused on business and trading, integrated with Google's AI Studio. This platform provides interactive learning, assessment, and community features centered around an MBA-style curriculum with practical trading tools.
 
@@ -107,7 +107,7 @@ An AI-powered educational platform focused on business and trading, integrated w
 4. Customize email templates to use codes instead of links:
 
 **Signup Confirmation Template**:
-```html
+```
 <h2>Confirm your email</h2>
 <p>Enter this code to confirm your account:</p>
 <h1>{{ .Token }}</h1>
@@ -115,8 +115,8 @@ An AI-powered educational platform focused on business and trading, integrated w
 ```
 
 **Passwordless Login Template**:
-```html
-<h2>Login to Maichez Trades</h2>
+```
+<h2>Login to Mbauni Protocol</h2>
 <p>Enter this code to login to your account:</p>
 <h1>{{ .Token }}</h1>
 <p>This code expires in 24 hours.</p>

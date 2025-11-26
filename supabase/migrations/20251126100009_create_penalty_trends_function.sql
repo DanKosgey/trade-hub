@@ -21,4 +21,4 @@ begin
     group by date_trunc('day', je.date)::date
     order by date_trunc('day', je.date)::date;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;

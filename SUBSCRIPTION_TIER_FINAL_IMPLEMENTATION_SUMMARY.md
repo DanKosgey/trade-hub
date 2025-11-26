@@ -1,7 +1,7 @@
 # Subscription Tier System - Final Implementation Summary
 
 ## Overview
-The subscription tier system has been successfully implemented to manage user access levels, application workflows, and community access within the Maichez Trades platform. This document summarizes the complete implementation and verifies that all requirements have been met.
+The subscription tier system has been successfully implemented to manage user access levels, application workflows, and community access within the Mbauni Protocol platform. This document summarizes the complete implementation and verifies that all requirements have been met.
 
 ## System Components
 

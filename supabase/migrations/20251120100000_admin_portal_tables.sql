@@ -40,7 +40,7 @@ begin
     from journal_entries je
     where je.user_id = get_student_stats.user_id;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create a function to get all students with their stats for admin portal
 create or replace function get_all_students_for_admin()
@@ -92,7 +92,7 @@ begin
         student_current_drawdown as current_drawdown
     from student_stats;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create a function to get all trades for admin portal with student info
 create or replace function get_all_trades_for_admin()
@@ -134,7 +134,7 @@ begin
     where p.role = 'student'
     order by je.date desc;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create a function to get business metrics for admin portal
 create or replace function get_business_metrics()
@@ -195,7 +195,7 @@ begin
     from profiles 
     where role = 'student';
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create a function to calculate revenue growth percentage
 create or replace function calculate_revenue_growth_percentage()
@@ -236,4 +236,4 @@ begin
     
     return growth_percentage;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;

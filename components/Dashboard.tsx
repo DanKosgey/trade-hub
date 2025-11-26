@@ -255,7 +255,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, courses, onContinueCourse }
     const endDate = formatDate(new Date(date.getTime() + durationMinutes * 60000));
     
     const details = "Join the live trading session with Alex Mbauni. Covered topics: Market Structure, Liquidity Sweeps, and Live Execution.";
-    const location = "Maichez Trades Live Room";
+    const location = "Mbauni Protocol Live Room";
     
     const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startDate}/${endDate}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}&sf=true&output=xml`;
     

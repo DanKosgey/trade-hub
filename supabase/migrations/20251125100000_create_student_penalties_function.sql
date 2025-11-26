@@ -38,4 +38,4 @@ begin
     order by (sp.rejected_count + sp.warning_count) desc
     limit 20;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;

@@ -15,7 +15,7 @@
 -- <p>This code expires in 24 hours.</p>
 
 -- For passwordless login email template, use:
--- <h2>Login to Maichez Trades</h2>
+-- <h2>Login to Mbauni Protocol</h2>
 -- <p>Enter this code to login to your account:</p>
 -- <h1>{{ .Token }}</h1>
 -- <p>This code expires in 24 hours.</p>

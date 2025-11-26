@@ -16,7 +16,7 @@ begin
     group by date_trunc('day', ce.enrolled_at)
     order by date_trunc('day', ce.enrolled_at);
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create function to get module completion rates by course
 create or replace function get_module_completion_rates()
@@ -44,7 +44,7 @@ begin
     group by c.id, c.title
     order by completion_rate desc;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create function to get course enrollment counts
 create or replace function get_course_enrollment_counts()
@@ -71,7 +71,7 @@ begin
     order by total_enrollments desc
     limit 10;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create function to get course difficulty distribution
 create or replace function get_course_difficulty_distribution()
@@ -88,7 +88,7 @@ begin
     group by c.level
     order by count desc;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
 
 -- Create function to get content type distribution
 create or replace function get_content_type_distribution()
@@ -105,4 +105,4 @@ begin
     group by cm.content_type
     order by count desc;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer;
