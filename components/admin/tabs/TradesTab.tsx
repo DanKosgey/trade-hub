@@ -1,5 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useAdminPortal } from '../AdminPortalContext';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+
+const COLORS = ['#00ff94', '#3b82f6', '#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
 const TradesTab: React.FC = () => {
   const { trades } = useAdminPortal();
@@ -57,11 +60,21 @@ const TradesTab: React.FC = () => {
     const netPnL = filteredTrades.reduce((s, t) => s + (t.pnl || 0), 0);
     
     // P&L by pair
-    const pairStats: Record<string, number> = {};
+    const pairStats: Record<string, { pnl: number; count: number }> = {};
     filteredTrades.forEach(t => {
-      if (t.pair) pairStats[t.pair] = (pairStats[t.pair] || 0) + (t.pnl || 0);
+      if (t.pair) {
+        if (!pairStats[t.pair]) {
+          pairStats[t.pair] = { pnl: 0, count: 0 };
+        }
+        pairStats[t.pair].pnl += (t.pnl || 0);
+        pairStats[t.pair].count += 1;
+      }
     });
-    const pairData = Object.entries(pairStats).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+    
+    // Convert to array and sort by absolute P&L value
+    const pairData = Object.entries(pairStats)
+      .map(([name, { pnl, count }]) => ({ name, value: pnl, count }))
+      .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
     
     return { total, wins, losses, winRate, netPnL, pairData };
   }, [filteredTrades]);
@@ -267,12 +280,73 @@ const TradesTab: React.FC = () => {
         <h3 className="font-bold text-xl mb-6 text-gray-200">P&L by Asset</h3>
         <div className="h-72">
           {tradeAnalytics.pairData.length > 0 ? (
-            <div className="h-full flex items-center justify-center text-gray-400">
-              <p>Chart component would be implemented here with recharts library</p>
-            </div>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={tradeAnalytics.pairData}
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#475569" opacity={0.5} />
+                <XAxis 
+                  dataKey="name" 
+                  stroke="#94a3b8" 
+                  fontSize={12}
+                  tick={{ fill: '#94a3b8' }}
+                />
+                <YAxis 
+                  stroke="#94a3b8" 
+                  fontSize={12}
+                  tick={{ fill: '#94a3b8' }}
+                  tickFormatter={(value) => `$${value}`}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1f2937', 
+                    border: '1px solid #475569', 
+                    borderRadius: '8px',
+                    color: '#fff'
+                  }} 
+                  formatter={(value) => [`$${value}`, 'P&L']}
+                  labelFormatter={(label) => `Asset: ${label}`}
+                />
+                <Bar 
+                  dataKey="value" 
+                  name="P&L" 
+                  fill="#00ff94" 
+                  radius={[4, 4, 0, 0]}
+                >
+                  {tradeAnalytics.pairData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.value >= 0 ? '#00ff94' : '#ef4444'} 
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           ) : (
             <div className="flex items-center justify-center h-full text-gray-400">No data available</div>
           )}
+        </div>
+        
+        {/* Asset Details */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {tradeAnalytics.pairData.map((asset, index) => (
+            <div key={asset.name} className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg border border-gray-700/30">
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-3 h-3 rounded-full" 
+                  style={{ backgroundColor: asset.value >= 0 ? '#00ff94' : '#ef4444' }}
+                ></div>
+                <span className="text-white font-medium">{asset.name}</span>
+              </div>
+              <div className="text-right">
+                <div className={`font-bold ${asset.value >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  ${asset.value.toFixed(2)}
+                </div>
+                <div className="text-gray-400 text-sm">{asset.count} trades</div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
