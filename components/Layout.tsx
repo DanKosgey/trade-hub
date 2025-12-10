@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { LayoutDashboard, GraduationCap, Bot, BookOpen, Users, LogOut, Settings, ShieldAlert, Menu, X, Layers, PieChart as PieIcon, CheckSquare } from 'lucide-react';
 import { User } from '../types';
 import NavigationButtons from './NavigationButtons';
+import { getAppDisplayName } from '../config/appConfig';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -53,7 +54,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView, on
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-trade-dark/90 backdrop-blur-md border-b border-gray-800 flex items-center justify-between px-4 z-50">
         <div className="flex items-center gap-2 text-white font-bold text-lg">
            <span className={`w-2 h-6 rounded-sm ${user.role === 'admin' ? 'bg-purple-500' : 'bg-trade-accent'}`}></span>
-           Mbauni <span className="text-trade-neon">Protocol</span>
+           {getAppDisplayName()} <span className="text-trade-neon">Protocol</span>
         </div>
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -80,7 +81,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentView, onChangeView, on
         <div className="p-6 border-b border-gray-800 hidden md:block">
           <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
             <span className={`w-2 h-6 rounded-sm ${user.role === 'admin' ? 'bg-purple-500' : 'bg-trade-accent'}`}></span>
-            {user.role === 'admin' ? 'Admin Portal' : 'Mbauni Protocol'}
+            {user.role === 'admin' ? 'Admin Portal' : getAppDisplayName()}
           </h1>
         </div>
         

@@ -3,6 +3,7 @@ import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Zap, Shield, TrendingUp, Play, Check, X, Star, Lock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { socialMediaService } from '../services/socialMediaService';
 import { SubscriptionPlan } from '../types';
+import { getAppDisplayName } from '../config/appConfig';
 
 interface LandingPageProps {
   onSelectTier: (tier: 'free' | 'foundation' | 'professional' | 'elite' | 'login') => void;
@@ -117,7 +118,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier, onPlanSelection
             >
               <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-trade-neon animate-pulse" />
               <span className="text-lg sm:text-xl md:text-2xl font-black tracking-tighter">
-                Mbauni <span className="text-trade-neon">Protocol</span>
+                 {getAppDisplayName()}
               </span>
             </motion.div>
             <motion.button
@@ -358,37 +359,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier, onPlanSelection
           </div>
         </section>
 
-        {/* Challenges & Achievements Section */}
-        <section className="py-6 sm:py-8 bg-gradient-to-r from-gray-900 to-black border-b border-gray-800">
-          <div className="container mx-auto px-4 sm:px-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 sm:gap-6">
-              <div className="bg-gray-800/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl text-center border border-gray-700 hover:border-trade-neon/50 transition">
-                <div className="text-trade-neon font-black text-lg sm:text-xl md:text-2xl">10{'>'}500</div>
-                <div className="text-gray-400 text-xs sm:text-sm mt-1">Completed</div>
-              </div>
-              <div className="bg-gray-800/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl text-center border border-gray-700 hover:border-trade-neon/50 transition">
-                <div className="text-trade-neon font-black text-lg sm:text-xl md:text-2xl">100{'>'}1000</div>
-                <div className="text-gray-400 text-xs sm:text-sm mt-1">Completed</div>
-              </div>
-              <div className="bg-gray-800/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl text-center border border-gray-700 hover:border-trade-neon/50 transition">
-                <div className="text-trade-neon font-black text-lg sm:text-xl md:text-2xl">20{'>'}1000</div>
-                <div className="text-gray-400 text-xs sm:text-sm mt-1">Completed</div>
-              </div>
-              <div className="bg-gray-800/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl text-center border border-gray-700 hover:border-trade-neon/50 transition">
-                <div className="text-trade-neon font-black text-lg sm:text-xl md:text-2xl">100{'>'}1500</div>
-                <div className="text-gray-400 text-xs sm:text-sm mt-1">Currently</div>
-              </div>
-              <div className="bg-gray-800/50 p-3 sm:p-4 rounded-xl sm:rounded-2xl text-center border border-gray-700 hover:border-trade-neon/50 transition md:col-span-1 sm:col-span-3 col-span-2">
-                <div className="text-trade-neon font-black text-lg sm:text-xl md:text-2xl">787 Pips</div>
-                <div className="text-gray-400 text-xs sm:text-sm mt-1">Most Pips/Trade</div>
-              </div>
-            </div>
-            
-            <div className="text-center mt-4 sm:mt-6">
-              <p className="text-gray-400 text-xs sm:text-sm">Highest Drawdown: <span className="text-red-400 font-bold">$600</span> • And many more achievements!</p>
-            </div>
-          </div>
-        </section>
+        {/* Challenges & Achievements Section removed per request */}
 
         {/* Why Traders Fail Section */}
         <section className="py-12 sm:py-20 bg-trade-dark border-t border-gray-800">
@@ -525,7 +496,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSelectTier, onPlanSelection
             </motion.div>
 
             <div className="mt-10 sm:mt-16 text-gray-600 text-xs sm:text-sm">
-              &copy; 2025 Mbauni Protocol. All rights reserved. Trading involves risk.
+              &copy; 2025 {getAppDisplayName()}. All rights reserved. Trading involves risk.
             </div>
           </div>
         </motion.section>

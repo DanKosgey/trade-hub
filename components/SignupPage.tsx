@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, TrendingUp, ArrowRight, Mail, AlertCircle, User, CheckCircle, RotateCcw } from 'lucide-react';
 import { supabase } from '../supabase/client';
+import { getAppDisplayName } from '../config/appConfig';
 
 interface SignupPageProps {
   onBack: () => void;
@@ -232,7 +233,7 @@ const SignupPage: React.FC<SignupPageProps> = ({ onBack, onSignupSuccess }) => {
           <h1 className="text-3xl font-black text-white tracking-tight mb-2">
             Create Account
           </h1>
-          <p className="text-gray-400">Join the Mbauni Protocol Community</p>
+          <p className="text-gray-400">Join the {getAppDisplayName()} Community</p>
         </div>
 
         <form onSubmit={handleSignup} className="space-y-5">

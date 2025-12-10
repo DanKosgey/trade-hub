@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, TrendingUp, ArrowRight, Mail, AlertCircle, Key } from 'lucide-react';
 import { supabase } from '../supabase/client';
+import { getAppDisplayName } from '../config/appConfig';
 
 interface LoginPageProps {
   onBack: () => void;
@@ -116,8 +117,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onBack }) => {
             {showPasswordLogin ? 'Welcome Back' : 'Passwordless Login'}
           </h1>
           <p className="text-gray-400">
-            {showPasswordLogin 
-              ? 'Access the Mbauni Protocol Terminal' 
+            {showPasswordLogin
+              ? `Access the ${getAppDisplayName()} Terminal`
               : 'Enter your email to receive a login code'}
           </p>
         </div>
